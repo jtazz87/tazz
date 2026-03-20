@@ -155,6 +155,26 @@
   .del-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; transition: all .15s; }
   .del-btn:hover { background: var(--red-dim); color: var(--red); }
 
+  /* 분석 카드 */
+  .a-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: .75rem; }
+  .a-card.warn { border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.04); }
+  .a-card.good { border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.04); }
+  .a-card.caution { border-color: rgba(251,191,36,0.4); background: rgba(251,191,36,0.04); }
+  .a-card.info { border-color: rgba(96,165,250,0.3); }
+  .a-card-title { font-size:12px; font-weight:500; color:var(--text2); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.5rem; display:flex; align-items:center; gap:6px; }
+  .a-card-body { font-size:13px; color:var(--text); line-height:1.7; }
+  .a-card-body strong { font-weight:500; color:var(--text); }
+  .a-badge { font-size:10px; padding:2px 7px; border-radius:5px; }
+  .a-badge.warn { background:rgba(248,113,113,0.15); color:#f87171; }
+  .a-badge.good { background:rgba(74,222,128,0.15); color:#4ade80; }
+  .a-badge.caution { background:rgba(251,191,36,0.15); color:#fbbf24; }
+  .a-badge.info { background:rgba(96,165,250,0.15); color:#60a5fa; }
+  .week-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:.5rem; }
+  .week-table th { color:var(--text2); font-weight:400; padding:4px 6px; text-align:right; border-bottom:1px solid var(--border); }
+  .week-table th:first-child { text-align:left; }
+  .week-table td { padding:5px 6px; text-align:right; border-bottom:0.5px solid var(--border); font-family:'DM Mono',monospace; }
+  .week-table td:first-child { text-align:left; color:var(--text2); font-family:inherit; }
+
   .phase-line { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); margin-bottom: 1rem; }
   .phase-dot { width: 8px; height: 8px; border-radius: 2px; }
 
@@ -174,15 +194,26 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('upload',this)">측정 추가</button>
     <button class="tab-btn" onclick="switchTab('chart',this)">차트</button>
+    <button class="tab-btn" onclick="switchTab('analysis',this)">분석</button>
     <button class="tab-btn" onclick="switchTab('history',this)">기록</button>
   </div>
 
   <!-- 업로드 패널 -->
   <div class="panel active" id="panel-upload">
-    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-      <div class="icon">📷</div>
-      <h3>스크린샷 업로드</h3>
-      <p>InBody 앱 캡처 또는 ACCUNIQ 결과 이미지를 올려주세요</p>
+
+    <!-- API 키 설정 -->
+    <div id="apiKeySection" style="margin-bottom:1rem">
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
+          <span style="font-size:12px;font-weight:500;color:var(--text2)">Gemini API 키</span>
+          <span id="apiKeyStatus" style="font-size:10px;padding:2px 7px;border-radius:4px;background:var(--red-dim);color:var(--red)">미설정</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="apiKeyInput" placeholder="AIza..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
+          <button class="btn btn-primary" onclick="saveApiKey()" style="white-space:nowrap">저장</button>
+        </div>
+        <p style="font-size:10px;color:var(--text3);margin-top:.4rem">aistudio.google.com에서 발급 · 브라우저에만 저장됨</p>
+      </div>
     </div>
     <div style="margin-bottom:1rem">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:.6rem">
@@ -322,6 +353,19 @@
       </div>
       <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
     </div>
+  </div>
+
+  <!-- 분석 패널 -->
+  <div class="panel" id="panel-analysis">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div>
+        <p style="font-size:13px;font-weight:500">AI 체성분 분석</p>
+        <p style="font-size:11px;color:var(--text2);margin-top:2px">InBody 기준 · 린벌크 추세 / 경고신호 / 조언</p>
+      </div>
+      <button class="btn btn-primary" onclick="runAnalysis()" id="analysisBtn">분석 실행</button>
+    </div>
+    <div class="status" id="analysisStatus"></div>
+    <div id="analysisResult"></div>
   </div>
 
   <!-- 기록 패널 -->
@@ -650,11 +694,16 @@ async function importXlsx(file) {
 
 // Upload & AI extraction (2장 지원)
 let img1Base64 = null, img2Base64 = null;
+let img1MediaType = 'image/jpeg', img2MediaType = 'image/jpeg';
 
 function readFileAsBase64(file) {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onload = e => {
+      const dataUrl = e.target.result;
+      const mediaType = file.type || 'image/jpeg';
+      res({ base64: dataUrl.split(',')[1], mediaType });
+    };
     r.onerror = rej;
     r.readAsDataURL(file);
   });
@@ -662,7 +711,9 @@ function readFileAsBase64(file) {
 
 document.getElementById('img1Input').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
-  img1Base64 = await readFileAsBase64(file);
+  const result = await readFileAsBase64(file);
+  img1Base64 = result.base64;
+  img1MediaType = result.mediaType;
   document.getElementById('preview1Img').src = URL.createObjectURL(file);
   document.getElementById('preview1Wrap').style.display = 'block';
   updateExtractBtn();
@@ -670,145 +721,63 @@ document.getElementById('img1Input').addEventListener('change', async e => {
 
 document.getElementById('img2Input').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
-  img2Base64 = await readFileAsBase64(file);
+  const result = await readFileAsBase64(file);
+  img2Base64 = result.base64;
+  img2MediaType = result.mediaType;
   document.getElementById('preview2Img').src = URL.createObjectURL(file);
   document.getElementById('preview2Wrap').style.display = 'block';
   updateExtractBtn();
 });
 
-function updateExtractBtn() {
-  document.getElementById('extractBtn').disabled = !img1Base64;
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) return;
+  localStorage.setItem('gemini-api-key', key);
+  document.getElementById('apiKeyInput').value = '';
+  updateApiKeyStatus();
+}
+
+function getApiKey() {
+  return localStorage.getItem('gemini-api-key') || '';
+}
+
+function updateApiKeyStatus() {
+  const key = getApiKey();
+  const el = document.getElementById('apiKeyStatus');
+  if (key) {
+    el.style.background = 'rgba(74,222,128,0.12)';
+    el.style.color = '#4ade80';
+    el.textContent = '설정됨';
+  } else {
+    el.style.background = 'rgba(248,113,113,0.12)';
+    el.style.color = '#f87171';
+    el.textContent = '미설정';
+  }
+}
+
+async function callGemini(images, prompt) {
+  const key = getApiKey();
+  if (!key) throw new Error('API 키가 없습니다. 먼저 Gemini API 키를 입력해주세요.');
+
+  const parts = images.map((img, i) => ({
+    inline_data: {
+      mime_type: i === 0 ? img1MediaType : img2MediaType,
+      data: img
+    }
+  }));
+  parts.push({ text: prompt });
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }] })
+  });
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
 function setStatus(type, msg) {
   const s = document.getElementById('status');
   s.className = 'status ' + type;
-  s.textContent = msg;
-}
-
-function getTodayStr() {
-  const d = new Date();
-  return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
-}
-
-async function callAI(images, prompt) {
-  const content = images.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }));
-  content.push({ type: 'text', text: prompt });
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 600, messages: [{ role: 'user', content }] })
-  });
-  const data = await res.json();
-  const text = data.content?.[0]?.text?.trim() ?? '';
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
-}
-
-async function extractMulti() {
-  if (!img1Base64) return;
-  setStatus('loading', 'AI가 이미지에서 데이터를 읽는 중...');
-  document.getElementById('extractedCard').style.display = 'none';
-  const todayStr = getTodayStr();
-
-  const images = img2Base64 ? [img1Base64, img2Base64] : [img1Base64];
-  const imgDesc = img2Base64 ? '두 장의 이미지' : '이미지';
-
-  try {
-    const parsed = await callAI(images, `${imgDesc}에서 체성분 수치를 모두 찾아 합쳐서 JSON 하나로 반환하세요. 반드시 JSON만, 다른 텍스트 없이.
-
-{"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null}
-
-- date: 이미지에서 날짜 찾아 YY.MM.DD 형식. 없으면 "${todayStr}"
-- device: InBody면 "InBody", ACCUNIQ이면 "ACCUNIQ"
-- weight: 체중(kg)
-- muscle: 골격근량(kg), 없으면 null
-- fat: 체지방량(kg), 없으면 null  
-- fatpct: 체지방률(%), 없으면 null
-- 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로
-- 단위 제외, 숫자만`);
-
-    document.getElementById('f-date').value = parsed.date ?? todayStr;
-    document.getElementById('f-device').value = parsed.device ?? 'InBody';
-    document.getElementById('f-weight').value = parsed.weight ?? '';
-    document.getElementById('f-muscle').value = parsed.muscle ?? '';
-    document.getElementById('f-fat').value = parsed.fat ?? '';
-    document.getElementById('f-fatpct').value = parsed.fatpct ?? '';
-
-    setStatus('success', '추출 완료 — 수치 확인 후 저장해주세요');
-    document.getElementById('extractedCard').style.display = 'block';
-  } catch(e) {
-    setStatus('error', '추출 실패 — 수동으로 입력해주세요');
-    document.getElementById('f-date').value = todayStr;
-    document.getElementById('extractedCard').style.display = 'block';
-  }
-}
-
-async function saveRecord() {
-  const date = document.getElementById('f-date').value.trim();
-  const device = document.getElementById('f-device').value;
-  const weight = parseFloat(document.getElementById('f-weight').value);
-  const muscle = parseFloat(document.getElementById('f-muscle').value) || null;
-  const fat = parseFloat(document.getElementById('f-fat').value);
-  const fatpct = parseFloat(document.getElementById('f-fatpct').value);
-
-  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) {
-    setStatus('error', '날짜, 체중, 지방량, 체지방률은 필수입니다');
-    return;
-  }
-
-  const existing = records.findIndex(r => r.date === date && r.device === device);
-  const rec = { date, device, weight, muscle, fat, fatpct };
-
-  if (existing >= 0) {
-    if (!confirm(`${date} ${device} 기록이 이미 있습니다. 덮어쓸까요?`)) return;
-    records[existing] = rec;
-  } else {
-    records.push(rec);
-  }
-  records.sort((a,b) => a.date.localeCompare(b.date));
-  await saveRecords();
-  setStatus('success', `${date} ${device} 저장 완료`);
-  renderAll();
-  setTimeout(resetUpload, 1500);
-}
-
-function resetUpload() {
-  img1Base64 = null; img2Base64 = null;
-  document.getElementById('img1Input').value = '';
-  document.getElementById('img2Input').value = '';
-  document.getElementById('preview1Wrap').style.display = 'none';
-  document.getElementById('preview2Wrap').style.display = 'none';
-  document.getElementById('extractedCard').style.display = 'none';
-  document.getElementById('extractBtn').disabled = true;
-  document.getElementById('status').className = 'status';
-}
-
-function exportXlsx() {
-  if (!records.length) { alert('저장된 기록이 없습니다.'); return; }
-  const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date));
-  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({
-    '날짜': r.date,
-    '체중': r.weight,
-    '근육': r.muscle ?? '',
-    '지방량': r.fat,
-    '지방률': r.fatpct,
-    '기기': r.device
-  })));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-  const today = getTodayStr().replace(/\./g, '');
-  XLSX.writeFile(wb, `체성분_${today}.xlsx`);
-}
-
-function switchTab(id, btn) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('panel-' + id).classList.add('active');
-  btn.classList.add('active');
-  if (id === 'chart') buildChart();
-}
-
-loadRecords();
-</script>
-</body>
-</html>
+  s.textConte
