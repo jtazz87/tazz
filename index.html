@@ -264,6 +264,30 @@
       <button class="mt-btn" onclick="setMetric('fatpct',this)">체지방률</button>
     </div>
 
+    <!-- 기간 필터 -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center">
+      <button class="mt-btn active" onclick="setRange('all',this)">전체</button>
+      <button class="mt-btn" onclick="setRange('cut',this)">감량기만</button>
+      <button class="mt-btn" onclick="setRange('bulk',this)">린벌크만</button>
+      <button class="mt-btn" onclick="setRange('3m',this)">최근 3개월</button>
+      <button class="mt-btn" onclick="setRange('1m',this)">최근 1개월</button>
+      <button class="mt-btn" id="customRangeBtn" onclick="toggleCustomRange()">직접 지정</button>
+    </div>
+    <div id="customRangeWrap" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:.75rem">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:120px">
+          <label>시작일</label>
+          <input type="text" id="rangeStart" placeholder="24.10.14" oninput="applyCustomRange()">
+        </div>
+        <div class="field" style="flex:1;min-width:120px">
+          <label>종료일</label>
+          <input type="text" id="rangeEnd" placeholder="26.03.19" oninput="applyCustomRange()">
+        </div>
+        <button class="btn btn-secondary" style="height:36px;font-size:12px" onclick="resetCustomRange()">초기화</button>
+      </div>
+      <p style="font-size:11px;color:var(--text3);margin-top:.5rem">형식: YY.MM.DD (예: 26.01.01)</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-header">
         <h4 id="chartTitle">체중 추이 — InBody 기준</h4>
@@ -272,9 +296,9 @@
           <span class="legend-item"><span class="legend-dot" style="background:#4ade80"></span>린벌크</span>
         </div>
       </div>
-      <div class="phase-line">
+      <div class="phase-line" id="phaseLine">
         <span class="phase-dot" style="background:#60a5fa"></span>감량 24.10.14~25.12.30
-        <span class="phase-dot" style="background:#4ade80" style="margin-left:8px"></span>린벌크 26.01.01~
+        <span class="phase-dot" style="background:#4ade80;margin-left:8px"></span>린벌크 26.01.01~
       </div>
       <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
     </div>
@@ -302,6 +326,74 @@ const STORAGE_KEY = 'body-comp-records';
 let records = [];
 let mainChart = null;
 let curMetric = 'weight';
+let curRange = 'all';
+let customStart = '';
+let customEnd = '';
+
+function setRange(range, btn) {
+  curRange = range;
+  document.querySelectorAll('.metric-toggle ~ div .mt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (range !== 'custom') {
+    document.getElementById('customRangeWrap').style.display = 'none';
+    document.getElementById('customRangeBtn').classList.remove('active');
+  }
+  buildChart();
+}
+
+function toggleCustomRange() {
+  const wrap = document.getElementById('customRangeWrap');
+  const btn = document.getElementById('customRangeBtn');
+  const showing = wrap.style.display !== 'none';
+  wrap.style.display = showing ? 'none' : 'block';
+  if (!showing) {
+    curRange = 'custom';
+    document.querySelectorAll('.metric-toggle ~ div .mt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  } else {
+    curRange = 'all';
+    document.querySelector('.metric-toggle ~ div .mt-btn').classList.add('active');
+    buildChart();
+  }
+}
+
+function applyCustomRange() {
+  customStart = document.getElementById('rangeStart').value.trim();
+  customEnd = document.getElementById('rangeEnd').value.trim();
+  curRange = 'custom';
+  buildChart();
+}
+
+function resetCustomRange() {
+  document.getElementById('rangeStart').value = '';
+  document.getElementById('rangeEnd').value = '';
+  customStart = ''; customEnd = '';
+  buildChart();
+}
+
+function getFilteredRecords() {
+  const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
+  if (!ib.length) return [];
+  const today = ib[ib.length-1].date;
+
+  if (curRange === 'all') return ib;
+  if (curRange === 'cut') return ib.filter(r => getPhase(r.date) === 'cut');
+  if (curRange === 'bulk') return ib.filter(r => getPhase(r.date) === 'bulk');
+  if (curRange === '3m') {
+    const d = new Date(); d.setMonth(d.getMonth()-3);
+    const cutStr = `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    return ib.filter(r => r.date >= cutStr);
+  }
+  if (curRange === '1m') {
+    const d = new Date(); d.setMonth(d.getMonth()-1);
+    const cutStr = `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    return ib.filter(r => r.date >= cutStr);
+  }
+  if (curRange === 'custom') {
+    return ib.filter(r => (!customStart || r.date >= customStart) && (!customEnd || r.date <= customEnd));
+  }
+  return ib;
+}
 
 const METRIC_CONFIG = {
   weight: { label: '체중', unit: 'kg', key: 'weight', color: '#60a5fa', min: 55, max: 92 },
@@ -394,7 +486,7 @@ function setMetric(m, btn) {
 function buildChart() {
   const cfg = METRIC_CONFIG[curMetric];
   document.getElementById('chartTitle').textContent = `${cfg.label} 추이 — InBody 기준`;
-  const ib = records.filter(r => r.device === 'InBody').sort((a,b)=>a.date.localeCompare(b.date));
+  const ib = getFilteredRecords();
 
   if (mainChart) { mainChart.destroy(); mainChart = null; }
   if (!ib.length) return;
