@@ -733,12 +733,20 @@ function saveApiKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
   if (!key) return;
   localStorage.setItem('gemini-api-key', key);
+  window._geminiKey = key;
   document.getElementById('apiKeyInput').value = '';
   updateApiKeyStatus();
+  const s = document.getElementById('status');
+  s.className = 'status success';
+  s.textContent = 'API 키 저장 완료!';
+  setTimeout(() => { s.className = 'status'; }, 2000);
 }
 
 function getApiKey() {
-  return localStorage.getItem('gemini-api-key') || '';
+  if (window._geminiKey) return window._geminiKey;
+  const k = localStorage.getItem('gemini-api-key');
+  if (k) { window._geminiKey = k; return k; }
+  return '';
 }
 
 function updateApiKeyStatus() {
@@ -771,13 +779,4 @@ async function callGemini(images, prompt) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts }] })
-  });
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
-}
-
-function setStatus(type, msg) {
-  const s = document.getElementById('status');
-  s.className = 'status ' + type;
-  s.textConte
+  })
