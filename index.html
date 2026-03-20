@@ -200,11 +200,31 @@
     </div>
 
     <div style="border-top:1px solid var(--border);padding-top:1rem;margin-bottom:1rem">
-      <p style="font-size:13px;font-weight:500;margin-bottom:.75rem">스크린샷으로 새 측정 추가</p>
+      <p style="font-size:13px;font-weight:500;margin-bottom:.35rem">스크린샷으로 새 측정 추가</p>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:.75rem">체지방률이 다른 화면에 있으면 2장 동시에 올려도 됩니다</p>
 
-    <div class="preview-wrap" id="previewWrap">
-      <img id="previewImg" src="" alt="preview">
+    <!-- 이미지 업로드 영역 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
+      <div>
+        <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img1Input').click()">
+          <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
+          <h3 style="font-size:12px">1장 업로드</h3>
+          <p style="font-size:10px">체중/근육/지방량</p>
+        </div>
+        <input type="file" id="img1Input" accept="image/*">
+        <div id="preview1Wrap" style="display:none;margin-top:6px"><img id="preview1Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
+      </div>
+      <div>
+        <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img2Input').click()">
+          <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
+          <h3 style="font-size:12px">2장 업로드 (선택)</h3>
+          <p style="font-size:10px">체지방률 등 추가 수치</p>
+        </div>
+        <input type="file" id="img2Input" accept="image/*">
+        <div id="preview2Wrap" style="display:none;margin-top:6px"><img id="preview2Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
+      </div>
     </div>
+    <button class="btn btn-primary" id="extractBtn" onclick="extractMulti()" style="width:100%;margin-bottom:.75rem" disabled>AI로 수치 추출</button>
 
     <div class="status" id="status"></div>
 
@@ -406,8 +426,8 @@ const METRIC_CONFIG = {
 
 async function loadRecords() {
   try {
-    const r = await window.storage.get(STORAGE_KEY);
-    records = r ? JSON.parse(r.value) : [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    records = raw ? JSON.parse(raw) : [];
   } catch(e) {
     records = [];
   }
@@ -416,7 +436,7 @@ async function loadRecords() {
 
 async function saveRecords() {
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(records));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   } catch(e) { console.error(e); }
 }
 
@@ -625,28 +645,36 @@ async function importXlsx(file) {
   }
 }
 
-// Upload & AI extraction
-const uploadZone = document.getElementById('uploadZone');
-const fileInput = document.getElementById('fileInput');
+// Upload & AI extraction (2장 지원)
+let img1Base64 = null, img2Base64 = null;
 
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
-uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+function readFileAsBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
 
-let currentBase64 = null;
+document.getElementById('img1Input').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  img1Base64 = await readFileAsBase64(file);
+  document.getElementById('preview1Img').src = URL.createObjectURL(file);
+  document.getElementById('preview1Wrap').style.display = 'block';
+  updateExtractBtn();
+});
 
-function handleFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const dataUrl = e.target.result;
-    currentBase64 = dataUrl.split(',')[1];
-    document.getElementById('previewImg').src = dataUrl;
-    document.getElementById('previewWrap').style.display = 'block';
-    extractData();
-  };
-  reader.readAsDataURL(file);
+document.getElementById('img2Input').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  img2Base64 = await readFileAsBase64(file);
+  document.getElementById('preview2Img').src = URL.createObjectURL(file);
+  document.getElementById('preview2Wrap').style.display = 'block';
+  updateExtractBtn();
+});
+
+function updateExtractBtn() {
+  document.getElementById('extractBtn').disabled = !img1Base64;
 }
 
 function setStatus(type, msg) {
@@ -655,47 +683,46 @@ function setStatus(type, msg) {
   s.textContent = msg;
 }
 
-async function extractData() {
+function getTodayStr() {
+  const d = new Date();
+  return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function callAI(images, prompt) {
+  const content = images.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }));
+  content.push({ type: 'text', text: prompt });
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 600, messages: [{ role: 'user', content }] })
+  });
+  const data = await res.json();
+  const text = data.content?.[0]?.text?.trim() ?? '';
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+async function extractMulti() {
+  if (!img1Base64) return;
   setStatus('loading', 'AI가 이미지에서 데이터를 읽는 중...');
   document.getElementById('extractedCard').style.display = 'none';
+  const todayStr = getTodayStr();
 
-  const today = new Date();
-  const yy = String(today.getFullYear()).slice(-2);
-  const mm = String(today.getMonth()+1).padStart(2,'0');
-  const dd = String(today.getDate()).padStart(2,'0');
-  const todayStr = `${yy}.${mm}.${dd}`;
+  const images = img2Base64 ? [img1Base64, img2Base64] : [img1Base64];
+  const imgDesc = img2Base64 ? '두 장의 이미지' : '이미지';
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: currentBase64 } },
-            { type: 'text', text: `이 체성분 측정 결과 이미지에서 다음 수치를 추출해주세요. 반드시 JSON만 반환하고 다른 텍스트는 절대 포함하지 마세요.
+    const parsed = await callAI(images, `${imgDesc}에서 체성분 수치를 모두 찾아 합쳐서 JSON 하나로 반환하세요. 반드시 JSON만, 다른 텍스트 없이.
 
-{"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자,"fatpct":숫자}
+{"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null}
 
-- date: 이미지에서 날짜를 찾아 YY.MM.DD 형식으로. 없으면 오늘날짜 "${todayStr}" 사용
-- device: InBody 앱이면 "InBody", ACCUNIQ이면 "ACCUNIQ"
+- date: 이미지에서 날짜 찾아 YY.MM.DD 형식. 없으면 "${todayStr}"
+- device: InBody면 "InBody", ACCUNIQ이면 "ACCUNIQ"
 - weight: 체중(kg)
-- muscle: 근육량(kg), 없으면 null
-- fat: 체지방량(kg)
-- fatpct: 체지방률(%)
-- 숫자는 소수점 포함 가능, 단위 제외` }
-          ]
-        }]
-      })
-    });
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text?.trim() ?? '';
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+- muscle: 골격근량(kg), 없으면 null
+- fat: 체지방량(kg), 없으면 null  
+- fatpct: 체지방률(%), 없으면 null
+- 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로
+- 단위 제외, 숫자만`);
 
     document.getElementById('f-date').value = parsed.date ?? todayStr;
     document.getElementById('f-device').value = parsed.device ?? 'InBody';
@@ -704,12 +731,11 @@ async function extractData() {
     document.getElementById('f-fat').value = parsed.fat ?? '';
     document.getElementById('f-fatpct').value = parsed.fatpct ?? '';
 
-    setStatus('success', '데이터 추출 완료 — 수치를 확인하고 저장해주세요');
+    setStatus('success', '추출 완료 — 수치 확인 후 저장해주세요');
     document.getElementById('extractedCard').style.display = 'block';
   } catch(e) {
     setStatus('error', '추출 실패 — 수동으로 입력해주세요');
     document.getElementById('f-date').value = todayStr;
-    document.getElementById('f-device').value = 'InBody';
     document.getElementById('extractedCard').style.display = 'block';
   }
 }
@@ -744,11 +770,14 @@ async function saveRecord() {
 }
 
 function resetUpload() {
-  document.getElementById('previewWrap').style.display = 'none';
+  img1Base64 = null; img2Base64 = null;
+  document.getElementById('img1Input').value = '';
+  document.getElementById('img2Input').value = '';
+  document.getElementById('preview1Wrap').style.display = 'none';
+  document.getElementById('preview2Wrap').style.display = 'none';
   document.getElementById('extractedCard').style.display = 'none';
-  document.getElementById('fileInput').value = '';
+  document.getElementById('extractBtn').disabled = true;
   document.getElementById('status').className = 'status';
-  currentBase64 = null;
 }
 
 function switchTab(id, btn) {
