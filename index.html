@@ -326,9 +326,12 @@
 
   <!-- 기록 패널 -->
   <div class="panel" id="panel-history">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
       <span id="recordCount" style="font-size:13px;color:var(--text2)"></span>
-      <button class="btn btn-danger" onclick="clearAll()">전체 삭제</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="exportXlsx()">📥 엑셀 다운로드</button>
+        <button class="btn btn-danger" onclick="clearAll()">전체 삭제</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table>
@@ -778,6 +781,23 @@ function resetUpload() {
   document.getElementById('extractedCard').style.display = 'none';
   document.getElementById('extractBtn').disabled = true;
   document.getElementById('status').className = 'status';
+}
+
+function exportXlsx() {
+  if (!records.length) { alert('저장된 기록이 없습니다.'); return; }
+  const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date));
+  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({
+    '날짜': r.date,
+    '체중': r.weight,
+    '근육': r.muscle ?? '',
+    '지방량': r.fat,
+    '지방률': r.fatpct,
+    '기기': r.device
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const today = getTodayStr().replace(/\./g, '');
+  XLSX.writeFile(wb, `체성분_${today}.xlsx`);
 }
 
 function switchTab(id, btn) {
