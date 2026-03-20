@@ -765,7 +765,7 @@ function updateApiKeyStatus() {
 
 async function callGemini(images, prompt) {
   const key = getApiKey();
-  if (!key) throw new Error('API 키가 없습니다. 먼저 Gemini API 키를 입력해주세요.');
+  if (!key) throw new Error('API 키가 없습니다.');
 
   const parts = images.map((img, i) => ({
     inline_data: {
@@ -775,13 +775,20 @@ async function callGemini(images, prompt) {
   }));
   parts.push({ text: prompt });
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts }] })
   });
+  
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(`API 오류 ${res.status}: ${errData.error?.message || res.statusText}`);
+  }
+  
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+  if (!text) throw new Error('응답 없음');
   return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
@@ -836,7 +843,7 @@ async function extractMulti() {
     setStatus('success', '추출 완료 — 수치 확인 후 저장해주세요');
     document.getElementById('extractedCard').style.display = 'block';
   } catch(e) {
-    setStatus('error', '추출 실패 — 수동으로 입력해주세요');
+    setStatus('error', '추출 실패: ' + e.message);
     document.getElementById('f-date').value = todayStr;
     document.getElementById('extractedCard').style.display = 'block';
   }
