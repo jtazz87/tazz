@@ -779,4 +779,259 @@ async function callGemini(images, prompt) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts }] })
-  })
+  });
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+function setStatus(type, msg) {
+  const s = document.getElementById('status');
+  s.className = 'status ' + type;
+  s.textContent = msg;
+}
+
+function getTodayStr() {
+  const d = new Date();
+  return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function updateExtractBtn() {
+  document.getElementById('extractBtn').disabled = !img1Base64;
+}
+
+async function extractMulti() {
+  if (!img1Base64) return;
+  if (!getApiKey()) {
+    setStatus('error', 'Gemini API 키를 먼저 입력해주세요.');
+    return;
+  }
+  setStatus('loading', 'AI가 이미지에서 데이터를 읽는 중...');
+  document.getElementById('extractedCard').style.display = 'none';
+  const todayStr = getTodayStr();
+  const images = img2Base64 ? [img1Base64, img2Base64] : [img1Base64];
+  const imgDesc = img2Base64 ? '두 장의 이미지' : '이미지';
+
+  try {
+    const parsed = await callGemini(images, `${imgDesc}에서 체성분 수치를 모두 찾아 합쳐서 JSON 하나로 반환하세요. 반드시 JSON만, 다른 텍스트 없이.
+
+{"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null}
+
+- date: 이미지에서 날짜 찾아 YY.MM.DD 형식. 없으면 "${todayStr}"
+- device: InBody면 "InBody", ACCUNIQ이면 "ACCUNIQ"
+- weight: 체중(kg)
+- muscle: 골격근량(kg), 없으면 null
+- fat: 체지방량(kg), 없으면 null
+- fatpct: 체지방률(%), 없으면 null
+- 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로
+- 단위 제외, 숫자만`);
+
+    document.getElementById('f-date').value = parsed.date ?? todayStr;
+    document.getElementById('f-device').value = parsed.device ?? 'InBody';
+    document.getElementById('f-weight').value = parsed.weight ?? '';
+    document.getElementById('f-muscle').value = parsed.muscle ?? '';
+    document.getElementById('f-fat').value = parsed.fat ?? '';
+    document.getElementById('f-fatpct').value = parsed.fatpct ?? '';
+
+    setStatus('success', '추출 완료 — 수치 확인 후 저장해주세요');
+    document.getElementById('extractedCard').style.display = 'block';
+  } catch(e) {
+    setStatus('error', '추출 실패 — 수동으로 입력해주세요');
+    document.getElementById('f-date').value = todayStr;
+    document.getElementById('extractedCard').style.display = 'block';
+  }
+}
+
+async function saveRecord() {
+  const date = document.getElementById('f-date').value.trim();
+  const device = document.getElementById('f-device').value;
+  const weight = parseFloat(document.getElementById('f-weight').value);
+  const muscle = parseFloat(document.getElementById('f-muscle').value) || null;
+  const fat = parseFloat(document.getElementById('f-fat').value);
+  const fatpct = parseFloat(document.getElementById('f-fatpct').value);
+
+  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) {
+    setStatus('error', '날짜, 체중, 지방량, 체지방률은 필수입니다');
+    return;
+  }
+
+  const existing = records.findIndex(r => r.date === date && r.device === device);
+  const rec = { date, device, weight, muscle, fat, fatpct };
+
+  if (existing >= 0) {
+    if (!confirm(`${date} ${device} 기록이 이미 있습니다. 덮어쓸까요?`)) return;
+    records[existing] = rec;
+  } else {
+    records.push(rec);
+  }
+  records.sort((a,b) => a.date.localeCompare(b.date));
+  await saveRecords();
+  setStatus('success', `${date} ${device} 저장 완료`);
+  renderAll();
+  setTimeout(resetUpload, 1500);
+}
+
+function resetUpload() {
+  img1Base64 = null; img2Base64 = null;
+  img1MediaType = 'image/jpeg'; img2MediaType = 'image/jpeg';
+  document.getElementById('img1Input').value = '';
+  document.getElementById('img2Input').value = '';
+  document.getElementById('preview1Wrap').style.display = 'none';
+  document.getElementById('preview2Wrap').style.display = 'none';
+  document.getElementById('extractedCard').style.display = 'none';
+  document.getElementById('extractBtn').disabled = true;
+  document.getElementById('status').className = 'status';
+}
+
+async function runAnalysis() {
+  const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
+  if (ib.length < 3) {
+    document.getElementById('analysisStatus').className = 'status error';
+    document.getElementById('analysisStatus').textContent = 'InBody 기록이 3개 이상 필요합니다.';
+    document.getElementById('analysisStatus').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('analysisStatus').className = 'status loading';
+  document.getElementById('analysisStatus').textContent = 'AI가 데이터를 분석하는 중...';
+  document.getElementById('analysisStatus').style.display = 'block';
+  document.getElementById('analysisResult').innerHTML = '';
+  document.getElementById('analysisBtn').disabled = true;
+
+  // 최근 7일 데이터
+  const today = ib[ib.length-1].date;
+  const d7 = new Date(2000 + parseInt(today.split('.')[0]), parseInt(today.split('.')[1])-1, parseInt(today.split('.')[2]));
+  d7.setDate(d7.getDate() - 7);
+  const d7str = `${String(d7.getFullYear()).slice(-2)}.${String(d7.getMonth()+1).padStart(2,'0')}.${String(d7.getDate()).padStart(2,'0')}`;
+  const week = ib.filter(r => r.date >= d7str);
+
+  // 린벌크 구간
+  const bulk = ib.filter(r => r.date >= '26.01.01');
+  const last = ib[ib.length-1];
+  const prev = ib[ib.length-2];
+
+  const dataStr = JSON.stringify({
+    전체InBody수: ib.length,
+    린벌크시작: bulk.length > 0 ? bulk[0] : null,
+    린벌크최신: last,
+    린벌크직전: prev,
+    최근7일: week,
+    린벌크전체: bulk.slice(-20)
+  });
+
+  try {
+    const prompt = `다음은 InBody 체성분 측정 데이터입니다. 린벌크 중인 30대 남성(178cm)의 데이터로, 목표 체지방률 허용 범위는 12~13%입니다.
+
+${dataStr}
+
+아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
+
+{
+  "trend": {
+    "grade": "good|caution|warn",
+    "title": "린벌크 추세 한 줄 요약",
+    "body": "2~3문장 분석. 근육증가속도, 지방변화, 전반적 방향성"
+  },
+  "week": {
+    "title": "최근 7일 변화 요약",
+    "body": "최근 7일 체중/근육/지방 변화 분석 2문장"
+  },
+  "warning": {
+    "grade": "good|caution|warn",
+    "title": "체지방 신호 판단",
+    "badge": "정상범위|주의|경고",
+    "body": "지방 상승이 실제 지방인지 수분/노이즈인지 판단. 식단 변경 필요 여부 포함. 2~3문장"
+  },
+  "advice": {
+    "title": "현시점 조언",
+    "body": "현재 데이터 기반 구체적 행동 조언 2~3문장"
+  }
+}`;
+
+    const key = getApiKey();
+    if (!key) throw new Error('API 키 없음');
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+
+    // 최근 7일 테이블 생성
+    const weekRows = week.map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td>${r.weight}</td>
+        <td>${r.muscle ?? '-'}</td>
+        <td>${r.fat}</td>
+        <td>${r.fatpct}%</td>
+      </tr>`).join('');
+
+    const gradeMap = { good: 'good', caution: 'caution', warn: 'warn', info: 'info' };
+
+    document.getElementById('analysisResult').innerHTML = `
+      <div class="a-card ${gradeMap[parsed.trend.grade] || 'info'}">
+        <div class="a-card-title">📈 린벌크 추세 <span class="a-badge ${gradeMap[parsed.trend.grade]}">${parsed.trend.title}</span></div>
+        <div class="a-card-body">${parsed.trend.body}</div>
+      </div>
+
+      <div class="a-card info">
+        <div class="a-card-title">📅 최근 7일</div>
+        <div class="a-card-body" style="margin-bottom:.75rem">${parsed.week.body}</div>
+        <table class="week-table">
+          <thead><tr><th>날짜</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th></tr></thead>
+          <tbody>${weekRows}</tbody>
+        </table>
+      </div>
+
+      <div class="a-card ${gradeMap[parsed.warning.grade] || 'info'}">
+        <div class="a-card-title">⚠️ 체지방 신호 <span class="a-badge ${gradeMap[parsed.warning.grade]}">${parsed.warning.badge}</span></div>
+        <div class="a-card-body">${parsed.warning.body}</div>
+      </div>
+
+      <div class="a-card info">
+        <div class="a-card-title">💡 현시점 조언</div>
+        <div class="a-card-body">${parsed.advice.body}</div>
+      </div>
+    `;
+
+    document.getElementById('analysisStatus').style.display = 'none';
+  } catch(e) {
+    document.getElementById('analysisStatus').className = 'status error';
+    document.getElementById('analysisStatus').textContent = '분석 실패 — 잠시 후 다시 시도해주세요';
+  }
+  document.getElementById('analysisBtn').disabled = false;
+}
+
+function exportXlsx() {
+  if (!records.length) { alert('저장된 기록이 없습니다.'); return; }
+  const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date));
+  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({
+    '날짜': r.date,
+    '체중': r.weight,
+    '근육': r.muscle ?? '',
+    '지방량': r.fat,
+    '지방률': r.fatpct,
+    '기기': r.device
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const today = getTodayStr().replace(/\./g, '');
+  XLSX.writeFile(wb, `체성분_${today}.xlsx`);
+}
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'chart') { renderStats(); buildChart(); }
+}
+
+loadRecords();
+updateApiKeyStatus();
+</script>
+</body>
+</html>
