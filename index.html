@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>체성분 트래커</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500&display=swap');
 
@@ -183,7 +184,23 @@
       <h3>스크린샷 업로드</h3>
       <p>InBody 앱 캡처 또는 ACCUNIQ 결과 이미지를 올려주세요</p>
     </div>
-    <input type="file" id="fileInput" accept="image/*">
+    <div style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:.6rem">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:11px;color:var(--text3)">또는 엑셀 파일로 일괄 가져오기</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <div class="upload-zone" style="padding:1.25rem" onclick="document.getElementById('xlsxInput').click()">
+        <div class="icon" style="font-size:22px;margin-bottom:.4rem">📊</div>
+        <h3 style="font-size:13px">엑셀 파일 업로드 (.xlsx)</h3>
+        <p style="font-size:11px">기존 체성분 기록 전체를 한 번에 가져옵니다<br>날짜/체중/근육/지방량/지방률/기기 컬럼 자동 인식 · 25.07.07 이전은 InBody로 자동 보정</p>
+      </div>
+      <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none">
+      <div class="status" id="xlsxStatus"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1rem;margin-bottom:1rem">
+      <p style="font-size:13px;font-weight:500;margin-bottom:.75rem">스크린샷으로 새 측정 추가</p>
 
     <div class="preview-wrap" id="previewWrap">
       <img id="previewImg" src="" alt="preview">
@@ -234,6 +251,7 @@
       </button>
     </div>
   </div>
+</div>
 
   <!-- 차트 패널 -->
   <div class="panel" id="panel-chart">
@@ -417,6 +435,84 @@ async function clearAll() {
   records = [];
   await saveRecords();
   renderAll();
+}
+
+// Excel import
+document.getElementById('xlsxInput').addEventListener('change', e => importXlsx(e.target.files[0]));
+
+function setXlsxStatus(type, msg) {
+  const s = document.getElementById('xlsxStatus');
+  s.className = 'status ' + type;
+  s.textContent = msg;
+}
+
+async function importXlsx(file) {
+  if (!file) return;
+  setXlsxStatus('loading', '엑셀 파일 읽는 중...');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+    // find header row
+    let headerRow = 0;
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+      if (rows[i].some(c => String(c).includes('날짜') || String(c).includes('체중'))) { headerRow = i; break; }
+    }
+    const headers = rows[headerRow].map(h => String(h ?? '').trim());
+
+    const idx = {
+      date: headers.findIndex(h => h.includes('날짜')),
+      weight: headers.findIndex(h => h.includes('체중')),
+      muscle: headers.findIndex(h => h.includes('근육')),
+      fat: headers.findIndex(h => h.includes('지방량')),
+      fatpct: headers.findIndex(h => h.includes('지방률')),
+      device: headers.findIndex(h => h.includes('기기')),
+    };
+
+    if (idx.date < 0 || idx.weight < 0) {
+      setXlsxStatus('error', '날짜/체중 컬럼을 찾지 못했습니다. 파일 형식을 확인해주세요.');
+      return;
+    }
+
+    const INBODY_CUTOFF = '25.07.07';
+    let imported = 0, skipped = 0;
+
+    for (let i = headerRow + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[idx.date]) continue;
+
+      const dateRaw = String(row[idx.date] ?? '').trim();
+      if (!dateRaw) continue;
+
+      const weight = parseFloat(row[idx.weight]);
+      const fat = parseFloat(row[idx.fat]);
+      const fatpct = parseFloat(row[idx.fatpct]);
+      if (isNaN(weight) || isNaN(fat) || isNaN(fatpct)) { skipped++; continue; }
+
+      const muscle = idx.muscle >= 0 ? (parseFloat(row[idx.muscle]) || null) : null;
+
+      // device correction: 25.07.07 이전은 InBody
+      let device = idx.device >= 0 ? String(row[idx.device] ?? '').trim() : 'ACCUNIQ';
+      if (!device) device = 'ACCUNIQ';
+      if (dateRaw <= INBODY_CUTOFF) device = 'InBody';
+
+      const rec = { date: dateRaw, device, weight, muscle, fat, fatpct };
+      const existing = records.findIndex(r => r.date === dateRaw && r.device === device);
+      if (existing >= 0) records[existing] = rec;
+      else records.push(rec);
+      imported++;
+    }
+
+    records.sort((a, b) => a.date.localeCompare(b.date));
+    await saveRecords();
+    renderAll();
+    setXlsxStatus('success', `${imported}개 기록 가져오기 완료${skipped ? ` (${skipped}개 건너뜀)` : ''} · 25.07.07 이전은 InBody로 자동 보정됨`);
+    document.getElementById('xlsxInput').value = '';
+  } catch(e) {
+    setXlsxStatus('error', '파일 읽기 실패: ' + e.message);
+  }
 }
 
 // Upload & AI extraction
