@@ -733,7 +733,7 @@ ${dataStr}
 
 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
 {
-  "trend": { "grade": "good|caution|warn", "title": "린벌크 추세 한 줄 요약 (26.01 시작 기준)", "body": "린벌크 시작(26.01.05) 대비 현재까지 근육/지방 변화 분석. 전월 평균과 현재 수치 비교 포함. 3문장" },
+  "trend": { "grade": "good|caution|warn", "title": "린벌크 추세 한 줄 요약", "bulk_points": ["린벌크 시작(26.01.05) 대비 현재까지 핵심 변화 1가지", "추가 분석 포인트 1가지", "추가 분석 포인트 1가지"], "prev_points": ["전월 평균 대비 현재 수치 비교 핵심 1가지", "추가 비교 포인트 1가지"] },
   "week": { "title": "최근 7일 변화", "body": "최근 7일 체중/근육/지방 변화 2문장" },
   "warning": { "grade": "good|caution|warn", "title": "체지방 신호", "badge": "정상범위|주의|경고", "body": "현재 체지방률 추세 판단. 신뢰도 수치 감안하여 노이즈 여부도 언급. 2~3문장" },
   "advice": { "title": "현시점 조언", "body": "데이터 기반 구체적 행동 조언. 신뢰도가 낮으면 재측정 권고도 포함. 2~3문장" }
@@ -793,7 +793,16 @@ ${dataStr}
         <div class="a-card-title">📈 린벌크 추세 (26.01.05 기준)
           <span class="a-badge ${gradeMap[parsed.trend.grade]}">${parsed.trend.title}</span>
         </div>
-        <div class="a-card-body">${parsed.trend.body}</div>
+        <div class="a-card-body">
+          <p style="font-size:11px;color:var(--text2);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.04em">26.01.05 린벌크 시작 이후</p>
+          <ul style="padding-left:1rem;margin:0 0 .75rem;display:flex;flex-direction:column;gap:4px">
+            ${(parsed.trend.bulk_points||[]).map(p=>`<li style="font-size:13px;color:var(--text)">${p}</li>`).join('')}
+          </ul>
+          ${pmAvg ? `<p style="font-size:11px;color:var(--text2);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.04em">전월 평균 비교</p>
+          <ul style="padding-left:1rem;margin:0 0 .75rem;display:flex;flex-direction:column;gap:4px">
+            ${(parsed.trend.prev_points||[]).map(p=>`<li style="font-size:13px;color:var(--text)">${p}</li>`).join('')}
+          </ul>` : ''}
+        </div>
         ${pmHtml}
       </div>
       <div class="a-card info">
