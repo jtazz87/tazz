@@ -8,98 +8,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500&display=swap');
-
   :root {
-    --bg: #0f0f0f;
-    --bg2: #181818;
-    --bg3: #222;
-    --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.14);
-    --text: #f0f0f0;
-    --text2: #888;
-    --text3: #555;
-    --green: #4ade80;
-    --green-dim: rgba(74,222,128,0.12);
-    --red: #f87171;
-    --red-dim: rgba(248,113,113,0.12);
-    --blue: #60a5fa;
-    --blue-dim: rgba(96,165,250,0.12);
-    --amber: #fbbf24;
-    --amber-dim: rgba(251,191,36,0.1);
+    --bg: #0f0f0f; --bg2: #181818; --bg3: #222;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f0; --text2: #888; --text3: #555;
+    --green: #4ade80; --green-dim: rgba(74,222,128,0.12);
+    --red: #f87171; --red-dim: rgba(248,113,113,0.12);
+    --blue: #60a5fa; --blue-dim: rgba(96,165,250,0.12);
+    --amber: #fbbf24; --amber-dim: rgba(251,191,36,0.1);
     --radius: 10px;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Sans KR', sans-serif;
-    font-size: 14px;
-    line-height: 1.6;
-    min-height: 100vh;
-  }
-
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 14px; line-height: 1.6; min-height: 100vh; }
   .app { max-width: 820px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-
   .header { margin-bottom: 2rem; }
   .header h1 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 4px; }
   .header p { color: var(--text2); font-size: 13px; }
-
-  /* tabs */
   .tabs { display: flex; gap: 4px; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0; }
   .tab-btn { padding: 8px 16px; font-size: 13px; font-family: inherit; background: none; border: none; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
   .tab-btn.active { color: var(--text); border-bottom-color: var(--green); }
   .tab-btn:hover:not(.active) { color: var(--text); }
   .panel { display: none; } .panel.active { display: block; }
-
-  /* upload zone */
-  .upload-zone {
-    border: 1.5px dashed var(--border2);
-    border-radius: var(--radius);
-    padding: 2.5rem 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all .2s;
-    background: var(--bg2);
-    margin-bottom: 1rem;
-  }
+  .upload-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; transition: all .2s; background: var(--bg2); margin-bottom: 1rem; }
   .upload-zone:hover, .upload-zone.drag { border-color: var(--green); background: rgba(74,222,128,0.04); }
   .upload-zone .icon { font-size: 32px; margin-bottom: .75rem; opacity: .6; }
   .upload-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: .35rem; }
   .upload-zone p { color: var(--text2); font-size: 12px; }
   #fileInput { display: none; }
-
-  .preview-wrap { display: none; margin-bottom: 1rem; }
-  .preview-wrap img { max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border); max-height: 320px; object-fit: contain; }
-
-  /* extracted data form */
-  .extracted-card {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    margin-bottom: 1rem;
-    display: none;
-  }
+  .extracted-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; display: none; }
   .extracted-card h4 { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .06em; }
   .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
   .field { display: flex; flex-direction: column; gap: 4px; }
   .field label { font-size: 11px; color: var(--text2); }
-  .field input, .field select {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 7px 10px;
-    color: var(--text);
-    font-size: 14px;
-    font-family: 'DM Mono', monospace;
-    outline: none;
-    transition: border-color .15s;
-  }
+  .field input, .field select { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 14px; font-family: 'DM Mono', monospace; outline: none; transition: border-color .15s; }
   .field input:focus, .field select:focus { border-color: var(--green); }
   .field select option { background: var(--bg3); }
-
   .btn { padding: 9px 20px; border-radius: 7px; border: none; font-family: inherit; font-size: 13px; cursor: pointer; font-weight: 500; transition: all .15s; }
   .btn-primary { background: var(--green); color: #0f0f0f; }
   .btn-primary:hover { background: #22c55e; }
@@ -108,24 +51,17 @@
   .btn-secondary:hover { color: var(--text); border-color: var(--border2); }
   .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
   .btn-danger:hover { background: rgba(248,113,113,0.2); }
-
   .btn-row { display: flex; gap: 8px; align-items: center; }
-
-  /* status */
   .status { font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-bottom: .75rem; display: none; }
   .status.loading { background: var(--blue-dim); color: var(--blue); display: block; }
   .status.success { background: var(--green-dim); color: var(--green); display: block; }
   .status.error { background: var(--red-dim); color: var(--red); display: block; }
-
-  /* stats cards */
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
   .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: .85rem 1rem; }
   .stat-card .val { font-size: 22px; font-weight: 500; font-family: 'DM Mono', monospace; line-height: 1.1; }
   .stat-card .lbl { font-size: 11px; color: var(--text2); margin-top: 3px; }
   .stat-card .chg { font-size: 12px; margin-top: 4px; font-family: 'DM Mono', monospace; }
   .pos { color: var(--green); } .neg { color: var(--red); } .neu { color: var(--text2); }
-
-  /* chart */
   .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
   .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
   .chart-header h4 { font-size: 13px; font-weight: 500; color: var(--text2); }
@@ -133,13 +69,9 @@
   .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
   .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
   .chart-wrap { position: relative; width: 100%; height: 220px; }
-
-  /* toggle */
   .metric-toggle { display: flex; gap: 4px; margin-bottom: .75rem; flex-wrap: wrap; }
   .mt-btn { font-size: 11px; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border); background: none; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
   .mt-btn.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
-
-  /* table */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; padding: 8px 10px; color: var(--text2); font-weight: 400; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
@@ -150,18 +82,15 @@
   .tag-bulk { background: var(--green-dim); color: var(--green); }
   .tag-inbody { background: rgba(251,191,36,0.12); color: var(--amber); }
   .tag-accuniq { background: var(--bg3); color: var(--text3); }
-
   .empty { text-align: center; padding: 3rem; color: var(--text2); font-size: 13px; }
   .del-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; transition: all .15s; }
   .del-btn:hover { background: var(--red-dim); color: var(--red); }
-
-  /* 분석 카드 */
   .a-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: .75rem; }
   .a-card.warn { border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.04); }
   .a-card.good { border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.04); }
   .a-card.caution { border-color: rgba(251,191,36,0.4); background: rgba(251,191,36,0.04); }
   .a-card.info { border-color: rgba(96,165,250,0.3); }
-  .a-card-title { font-size:12px; font-weight:500; color:var(--text2); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.5rem; display:flex; align-items:center; gap:6px; }
+  .a-card-title { font-size:12px; font-weight:500; color:var(--text2); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.5rem; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .a-card-body { font-size:13px; color:var(--text); line-height:1.7; }
   .a-card-body strong { font-weight:500; color:var(--text); }
   .a-badge { font-size:10px; padding:2px 7px; border-radius:5px; }
@@ -174,10 +103,8 @@
   .week-table th:first-child { text-align:left; }
   .week-table td { padding:5px 6px; text-align:right; border-bottom:0.5px solid var(--border); font-family:'DM Mono',monospace; }
   .week-table td:first-child { text-align:left; color:var(--text2); font-family:inherit; }
-
   .phase-line { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); margin-bottom: 1rem; }
   .phase-dot { width: 8px; height: 8px; border-radius: 2px; }
-
   @media (max-width: 600px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .field-grid { grid-template-columns: repeat(2, 1fr); }
@@ -190,7 +117,6 @@
     <h1>체성분 트래커</h1>
     <p>스크린샷 업로드 → AI가 자동 추출 → 누적 데이터 저장</p>
   </div>
-
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('upload',this)">측정 추가</button>
     <button class="tab-btn" onclick="switchTab('chart',this)">차트</button>
@@ -198,10 +124,7 @@
     <button class="tab-btn" onclick="switchTab('history',this)">기록</button>
   </div>
 
-  <!-- 업로드 패널 -->
   <div class="panel active" id="panel-upload">
-
-    <!-- API 키 설정 -->
     <div id="apiKeySection" style="margin-bottom:1rem">
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
@@ -229,93 +152,60 @@
       <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none">
       <div class="status" id="xlsxStatus"></div>
     </div>
-
     <div style="border-top:1px solid var(--border);padding-top:1rem;margin-bottom:1rem">
       <p style="font-size:13px;font-weight:500;margin-bottom:.35rem">스크린샷으로 새 측정 추가</p>
       <p style="font-size:11px;color:var(--text2);margin-bottom:.75rem">체지방률이 다른 화면에 있으면 2장 동시에 올려도 됩니다</p>
-
-    <!-- 이미지 업로드 영역 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
-      <div>
-        <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img1Input').click()">
-          <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
-          <h3 style="font-size:12px">1장 업로드</h3>
-          <p style="font-size:10px">체중/근육/지방량</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
+        <div>
+          <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img1Input').click()">
+            <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
+            <h3 style="font-size:12px">1장 업로드</h3>
+            <p style="font-size:10px">체중/근육/지방량</p>
+          </div>
+          <input type="file" id="img1Input" accept="image/*">
+          <div id="preview1Wrap" style="display:none;margin-top:6px"><img id="preview1Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
         </div>
-        <input type="file" id="img1Input" accept="image/*">
-        <div id="preview1Wrap" style="display:none;margin-top:6px"><img id="preview1Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
-      </div>
-      <div>
-        <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img2Input').click()">
-          <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
-          <h3 style="font-size:12px">2장 업로드 (선택)</h3>
-          <p style="font-size:10px">체지방률 등 추가 수치</p>
-        </div>
-        <input type="file" id="img2Input" accept="image/*">
-        <div id="preview2Wrap" style="display:none;margin-top:6px"><img id="preview2Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
-      </div>
-    </div>
-    <button class="btn btn-primary" id="extractBtn" onclick="extractMulti()" style="width:100%;margin-bottom:.75rem" disabled>AI로 수치 추출</button>
-
-    <div class="status" id="status"></div>
-
-    <div class="extracted-card" id="extractedCard">
-      <h4>추출된 데이터 — 확인 후 저장</h4>
-      <div class="field-grid">
-        <div class="field">
-          <label>날짜</label>
-          <input type="text" id="f-date" placeholder="26.03.20">
-        </div>
-        <div class="field">
-          <label>기기</label>
-          <select id="f-device">
-            <option value="InBody">InBody</option>
-            <option value="ACCUNIQ">ACCUNIQ</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>체중 (kg)</label>
-          <input type="number" id="f-weight" step="0.1">
-        </div>
-        <div class="field">
-          <label>근육량 (kg)</label>
-          <input type="number" id="f-muscle" step="0.1">
-        </div>
-        <div class="field">
-          <label>지방량 (kg)</label>
-          <input type="number" id="f-fat" step="0.1">
-        </div>
-        <div class="field">
-          <label>체지방률 (%)</label>
-          <input type="number" id="f-fatpct" step="0.1">
+        <div>
+          <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img2Input').click()">
+            <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
+            <h3 style="font-size:12px">2장 업로드 (선택)</h3>
+            <p style="font-size:10px">체지방률 등 추가 수치</p>
+          </div>
+          <input type="file" id="img2Input" accept="image/*">
+          <div id="preview2Wrap" style="display:none;margin-top:6px"><img id="preview2Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
         </div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" id="saveBtn" onclick="saveRecord()">저장</button>
-        <button class="btn btn-secondary" onclick="resetUpload()">취소</button>
+      <button class="btn btn-primary" id="extractBtn" onclick="extractMulti()" style="width:100%;margin-bottom:.75rem" disabled>AI로 수치 추출</button>
+      <div class="status" id="status"></div>
+      <div class="extracted-card" id="extractedCard">
+        <h4>추출된 데이터 — 확인 후 저장</h4>
+        <div class="field-grid">
+          <div class="field"><label>날짜</label><input type="text" id="f-date" placeholder="26.03.20"></div>
+          <div class="field"><label>기기</label><select id="f-device"><option value="InBody">InBody</option><option value="ACCUNIQ">ACCUNIQ</option></select></div>
+          <div class="field"><label>체중 (kg)</label><input type="number" id="f-weight" step="0.1"></div>
+          <div class="field"><label>근육량 (kg)</label><input type="number" id="f-muscle" step="0.1"></div>
+          <div class="field"><label>지방량 (kg)</label><input type="number" id="f-fat" step="0.1"></div>
+          <div class="field"><label>체지방률 (%)</label><input type="number" id="f-fatpct" step="0.1"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="saveBtn" onclick="saveRecord()">저장</button>
+          <button class="btn btn-secondary" onclick="resetUpload()">취소</button>
+        </div>
       </div>
-    </div>
-
-    <div style="margin-top:1rem">
-      <button class="btn btn-secondary" onclick="switchTab('history', document.querySelectorAll('.tab-btn')[2])">
-        기록 보기 →
-      </button>
+      <div style="margin-top:1rem">
+        <button class="btn btn-secondary" onclick="switchTab('history', document.querySelectorAll('.tab-btn')[3])">기록 보기 →</button>
+      </div>
     </div>
   </div>
-</div>
 
-  <!-- 차트 패널 -->
   <div class="panel" id="panel-chart">
     <div class="stats-grid" id="statsGrid"></div>
-
     <div class="metric-toggle" id="metricToggle">
       <button class="mt-btn active" onclick="setMetric('weight',this)">체중</button>
       <button class="mt-btn" onclick="setMetric('muscle',this)">근육량</button>
       <button class="mt-btn" onclick="setMetric('fat',this)">지방량</button>
       <button class="mt-btn" onclick="setMetric('fatpct',this)">체지방률</button>
     </div>
-
-    <!-- 기간 필터 -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center">
       <button class="mt-btn active" onclick="setRange('all',this)">전체</button>
       <button class="mt-btn" onclick="setRange('cut',this)">감량기만</button>
@@ -326,19 +216,12 @@
     </div>
     <div id="customRangeWrap" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:.75rem">
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-        <div class="field" style="flex:1;min-width:120px">
-          <label>시작일</label>
-          <input type="text" id="rangeStart" placeholder="24.10.14" oninput="applyCustomRange()">
-        </div>
-        <div class="field" style="flex:1;min-width:120px">
-          <label>종료일</label>
-          <input type="text" id="rangeEnd" placeholder="26.03.19" oninput="applyCustomRange()">
-        </div>
+        <div class="field" style="flex:1;min-width:120px"><label>시작일</label><input type="text" id="rangeStart" placeholder="24.10.14" oninput="applyCustomRange()"></div>
+        <div class="field" style="flex:1;min-width:120px"><label>종료일</label><input type="text" id="rangeEnd" placeholder="26.03.19" oninput="applyCustomRange()"></div>
         <button class="btn btn-secondary" style="height:36px;font-size:12px" onclick="resetCustomRange()">초기화</button>
       </div>
       <p style="font-size:11px;color:var(--text3);margin-top:.5rem">형식: YY.MM.DD (예: 26.01.01)</p>
     </div>
-
     <div class="chart-card">
       <div class="chart-header">
         <h4 id="chartTitle">체중 추이 — InBody 기준</h4>
@@ -355,12 +238,11 @@
     </div>
   </div>
 
-  <!-- 분석 패널 -->
   <div class="panel" id="panel-analysis">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
       <div>
         <p style="font-size:13px;font-weight:500">AI 체성분 분석</p>
-        <p style="font-size:11px;color:var(--text2);margin-top:2px">InBody 기준 · 린벌크 추세 / 경고신호 / 조언</p>
+        <p style="font-size:11px;color:var(--text2);margin-top:2px">InBody 기준 · 신뢰도 / 린벌크 추세 / 경고신호 / 조언</p>
       </div>
       <button class="btn btn-primary" onclick="runAnalysis()" id="analysisBtn">분석 실행</button>
     </div>
@@ -368,7 +250,6 @@
     <div id="analysisResult"></div>
   </div>
 
-  <!-- 기록 패널 -->
   <div class="panel" id="panel-history">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
       <span id="recordCount" style="font-size:13px;color:var(--text2)"></span>
@@ -379,9 +260,7 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr>
-          <th>날짜</th><th>기기</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th><th>페이즈</th><th></th>
-        </tr></thead>
+        <thead><tr><th>날짜</th><th>기기</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th><th>페이즈</th><th></th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
@@ -405,8 +284,7 @@ function setRange(range, btn) {
     document.getElementById('customRangeWrap').style.display = 'none';
     document.getElementById('customRangeBtn').classList.remove('active');
   }
-  renderStats();
-  buildChart();
+  renderStats(); buildChart();
 }
 
 function toggleCustomRange() {
@@ -428,39 +306,32 @@ function toggleCustomRange() {
 function applyCustomRange() {
   customStart = document.getElementById('rangeStart').value.trim();
   customEnd = document.getElementById('rangeEnd').value.trim();
-  curRange = 'custom';
-  renderStats();
-  buildChart();
+  curRange = 'custom'; renderStats(); buildChart();
 }
 
 function resetCustomRange() {
   document.getElementById('rangeStart').value = '';
   document.getElementById('rangeEnd').value = '';
-  customStart = ''; customEnd = '';
-  buildChart();
+  customStart = ''; customEnd = ''; buildChart();
 }
 
 function getFilteredRecords() {
   const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
   if (!ib.length) return [];
-  const today = ib[ib.length-1].date;
-
   if (curRange === 'all') return ib;
   if (curRange === 'cut') return ib.filter(r => getPhase(r.date) === 'cut');
   if (curRange === 'bulk') return ib.filter(r => getPhase(r.date) === 'bulk');
   if (curRange === '3m') {
     const d = new Date(); d.setMonth(d.getMonth()-3);
-    const cutStr = `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
-    return ib.filter(r => r.date >= cutStr);
+    const s = `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    return ib.filter(r => r.date >= s);
   }
   if (curRange === '1m') {
     const d = new Date(); d.setMonth(d.getMonth()-1);
-    const cutStr = `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
-    return ib.filter(r => r.date >= cutStr);
+    const s = `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    return ib.filter(r => r.date >= s);
   }
-  if (curRange === 'custom') {
-    return ib.filter(r => (!customStart || r.date >= customStart) && (!customEnd || r.date <= customEnd));
-  }
+  if (curRange === 'custom') return ib.filter(r => (!customStart || r.date >= customStart) && (!customEnd || r.date <= customEnd));
   return ib;
 }
 
@@ -472,54 +343,37 @@ const METRIC_CONFIG = {
 };
 
 async function loadRecords() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    records = raw ? JSON.parse(raw) : [];
-  } catch(e) {
-    records = [];
-  }
+  try { const raw = localStorage.getItem(STORAGE_KEY); records = raw ? JSON.parse(raw) : []; }
+  catch(e) { records = []; }
   renderAll();
 }
 
 async function saveRecords() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch(e) { console.error(e); }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }
+  catch(e) { console.error(e); }
 }
 
 function getPhase(dateStr) {
   if (!dateStr) return 'cut';
   const parts = dateStr.split('.');
   if (parts.length < 2) return 'cut';
-  const year = parseInt(parts[0]);
-  return year >= 26 ? 'bulk' : 'cut';
+  return parseInt(parts[0]) >= 26 ? 'bulk' : 'cut';
 }
 
-function renderAll() {
-  renderHistory();
-  renderStats();
-  buildChart();
-}
+function renderAll() { renderHistory(); renderStats(); buildChart(); }
 
 function renderHistory() {
   const tbody = document.getElementById('historyBody');
   const sorted = [...records].sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('recordCount').textContent = `총 ${records.length}개 기록`;
-
-  if (!sorted.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty">아직 데이터가 없습니다. 스크린샷을 업로드해주세요.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = sorted.map((r, i) => {
+  if (!sorted.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty">아직 데이터가 없습니다.</td></tr>`; return; }
+  tbody.innerHTML = sorted.map(r => {
     const phase = getPhase(r.date);
     const orig_i = records.indexOf(r);
     return `<tr>
       <td>${r.date}</td>
       <td><span class="tag ${r.device==='InBody'?'tag-inbody':'tag-accuniq'}">${r.device}</span></td>
-      <td>${r.weight}</td>
-      <td>${r.muscle ?? '-'}</td>
-      <td>${r.fat}</td>
-      <td>${r.fatpct}%</td>
+      <td>${r.weight}</td><td>${r.muscle ?? '-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td>
       <td><span class="tag ${phase==='bulk'?'tag-bulk':'tag-cut'}">${phase==='bulk'?'린벌크':'감량'}</span></td>
       <td><button class="del-btn" onclick="deleteRecord(${orig_i})">✕</button></td>
     </tr>`;
@@ -551,13 +405,12 @@ function renderStats() {
   const dp = (last.fatpct - first.fatpct).toFixed(1);
   const sign = v => v > 0 ? '+' : '';
   const cls = (v, posGood) => posGood ? (v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu') : (v < 0 ? 'pos' : v > 0 ? 'neg' : 'neu');
-  const rangeLabel = getRangeLabel();
-
+  const rl = getRangeLabel();
   document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-card"><div class="val">${last.weight}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 체중</div><div class="chg ${cls(dw,false)}">${sign(dw)}${dw}kg (${rangeLabel})</div></div>
-    <div class="stat-card"><div class="val">${last.muscle ?? '-'}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 근육량</div><div class="chg ${dm!=null?cls(dm,true):'neu'}">${dm!=null?sign(dm)+dm+'kg ('+rangeLabel+')':'—'}</div></div>
-    <div class="stat-card"><div class="val">${last.fat}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 지방량</div><div class="chg ${cls(df,false)}">${sign(df)}${df}kg (${rangeLabel})</div></div>
-    <div class="stat-card"><div class="val">${last.fatpct}<span style="font-size:13px;font-weight:400">%</span></div><div class="lbl">체지방률</div><div class="chg ${cls(dp,false)}">${sign(dp)}${dp}%p (${rangeLabel})</div></div>
+    <div class="stat-card"><div class="val">${last.weight}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 체중</div><div class="chg ${cls(dw,false)}">${sign(dw)}${dw}kg (${rl})</div></div>
+    <div class="stat-card"><div class="val">${last.muscle ?? '-'}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 근육량</div><div class="chg ${dm!=null?cls(dm,true):'neu'}">${dm!=null?sign(dm)+dm+'kg ('+rl+')':'—'}</div></div>
+    <div class="stat-card"><div class="val">${last.fat}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 지방량</div><div class="chg ${cls(df,false)}">${sign(df)}${df}kg (${rl})</div></div>
+    <div class="stat-card"><div class="val">${last.fatpct}<span style="font-size:13px;font-weight:400">%</span></div><div class="lbl">체지방률</div><div class="chg ${cls(dp,false)}">${sign(dp)}${dp}%p (${rl})</div></div>
   `;
 }
 
@@ -572,14 +425,11 @@ function buildChart() {
   const cfg = METRIC_CONFIG[curMetric];
   document.getElementById('chartTitle').textContent = `${cfg.label} 추이 — InBody 기준`;
   const ib = getFilteredRecords();
-
   if (mainChart) { mainChart.destroy(); mainChart = null; }
   if (!ib.length) return;
-
   const ctx = document.getElementById('mainChart').getContext('2d');
   const cutData = ib.map(r => getPhase(r.date) === 'cut' ? (r[cfg.key] ?? null) : null);
   const bulkData = ib.map(r => getPhase(r.date) === 'bulk' ? (r[cfg.key] ?? null) : null);
-
   mainChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -602,25 +452,19 @@ function buildChart() {
 
 async function deleteRecord(i) {
   if (!confirm('이 기록을 삭제할까요?')) return;
-  records.splice(i, 1);
-  await saveRecords();
-  renderAll();
+  records.splice(i, 1); await saveRecords(); renderAll();
 }
 
 async function clearAll() {
   if (!confirm('전체 기록을 삭제할까요? 되돌릴 수 없습니다.')) return;
-  records = [];
-  await saveRecords();
-  renderAll();
+  records = []; await saveRecords(); renderAll();
 }
 
-// Excel import
 document.getElementById('xlsxInput').addEventListener('change', e => importXlsx(e.target.files[0]));
 
 function setXlsxStatus(type, msg) {
   const s = document.getElementById('xlsxStatus');
-  s.className = 'status ' + type;
-  s.textContent = msg;
+  s.className = 'status ' + type; s.textContent = msg;
 }
 
 async function importXlsx(file) {
@@ -631,14 +475,11 @@ async function importXlsx(file) {
     const wb = XLSX.read(buf, { type: 'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-    // find header row
     let headerRow = 0;
     for (let i = 0; i < Math.min(5, rows.length); i++) {
       if (rows[i].some(c => String(c).includes('날짜') || String(c).includes('체중'))) { headerRow = i; break; }
     }
     const headers = rows[headerRow].map(h => String(h ?? '').trim());
-
     const idx = {
       date: headers.findIndex(h => h.includes('날짜')),
       weight: headers.findIndex(h => h.includes('체중')),
@@ -647,73 +488,49 @@ async function importXlsx(file) {
       fatpct: headers.findIndex(h => h.includes('지방률')),
       device: headers.findIndex(h => h.includes('기기')),
     };
-
-    if (idx.date < 0 || idx.weight < 0) {
-      setXlsxStatus('error', '날짜/체중 컬럼을 찾지 못했습니다. 파일 형식을 확인해주세요.');
-      return;
-    }
-
-    const INBODY_CUTOFF = '25.07.07';
+    if (idx.date < 0 || idx.weight < 0) { setXlsxStatus('error', '날짜/체중 컬럼을 찾지 못했습니다.'); return; }
+    const CUTOFF = '25.07.07';
     let imported = 0, skipped = 0;
-
     for (let i = headerRow + 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row || !row[idx.date]) continue;
-
       const dateRaw = String(row[idx.date] ?? '').trim();
       if (!dateRaw) continue;
-
       const weight = parseFloat(row[idx.weight]);
       const fat = parseFloat(row[idx.fat]);
       const fatpct = parseFloat(row[idx.fatpct]);
       if (isNaN(weight) || isNaN(fat) || isNaN(fatpct)) { skipped++; continue; }
-
       const muscle = idx.muscle >= 0 ? (parseFloat(row[idx.muscle]) || null) : null;
-
-      // device correction: 25.07.07 이전은 InBody
       let device = idx.device >= 0 ? String(row[idx.device] ?? '').trim() : 'ACCUNIQ';
       if (!device) device = 'ACCUNIQ';
-      if (dateRaw <= INBODY_CUTOFF) device = 'InBody';
-
+      if (dateRaw <= CUTOFF) device = 'InBody';
       const rec = { date: dateRaw, device, weight, muscle, fat, fatpct };
       const existing = records.findIndex(r => r.date === dateRaw && r.device === device);
-      if (existing >= 0) records[existing] = rec;
-      else records.push(rec);
+      if (existing >= 0) records[existing] = rec; else records.push(rec);
       imported++;
     }
-
     records.sort((a, b) => a.date.localeCompare(b.date));
-    await saveRecords();
-    renderAll();
-    setXlsxStatus('success', `${imported}개 기록 가져오기 완료${skipped ? ` (${skipped}개 건너뜀)` : ''} · 25.07.07 이전은 InBody로 자동 보정됨`);
+    await saveRecords(); renderAll();
+    setXlsxStatus('success', `${imported}개 기록 가져오기 완료${skipped ? ` (${skipped}개 건너뜀)` : ''}`);
     document.getElementById('xlsxInput').value = '';
-  } catch(e) {
-    setXlsxStatus('error', '파일 읽기 실패: ' + e.message);
-  }
+  } catch(e) { setXlsxStatus('error', '파일 읽기 실패: ' + e.message); }
 }
 
-// Upload & AI extraction (2장 지원)
 let img1Base64 = null, img2Base64 = null;
 let img1MediaType = 'image/jpeg', img2MediaType = 'image/jpeg';
 
 function readFileAsBase64(file) {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload = e => {
-      const dataUrl = e.target.result;
-      const mediaType = file.type || 'image/jpeg';
-      res({ base64: dataUrl.split(',')[1], mediaType });
-    };
-    r.onerror = rej;
-    r.readAsDataURL(file);
+    r.onload = e => { const d = e.target.result; res({ base64: d.split(',')[1], mediaType: file.type || 'image/jpeg' }); };
+    r.onerror = rej; r.readAsDataURL(file);
   });
 }
 
 document.getElementById('img1Input').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   const result = await readFileAsBase64(file);
-  img1Base64 = result.base64;
-  img1MediaType = result.mediaType;
+  img1Base64 = result.base64; img1MediaType = result.mediaType;
   document.getElementById('preview1Img').src = URL.createObjectURL(file);
   document.getElementById('preview1Wrap').style.display = 'block';
   updateExtractBtn();
@@ -722,8 +539,7 @@ document.getElementById('img1Input').addEventListener('change', async e => {
 document.getElementById('img2Input').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   const result = await readFileAsBase64(file);
-  img2Base64 = result.base64;
-  img2MediaType = result.mediaType;
+  img2Base64 = result.base64; img2MediaType = result.mediaType;
   document.getElementById('preview2Img').src = URL.createObjectURL(file);
   document.getElementById('preview2Wrap').style.display = 'block';
   updateExtractBtn();
@@ -737,8 +553,7 @@ function saveApiKey() {
   document.getElementById('apiKeyInput').value = '';
   updateApiKeyStatus();
   const s = document.getElementById('status');
-  s.className = 'status success';
-  s.textContent = 'API 키 저장 완료!';
+  s.className = 'status success'; s.textContent = 'API 키 저장 완료!';
   setTimeout(() => { s.className = 'status'; }, 2000);
 }
 
@@ -752,94 +567,51 @@ function getApiKey() {
 function updateApiKeyStatus() {
   const key = getApiKey();
   const el = document.getElementById('apiKeyStatus');
-  if (key) {
-    el.style.background = 'rgba(74,222,128,0.12)';
-    el.style.color = '#4ade80';
-    el.textContent = '설정됨';
-  } else {
-    el.style.background = 'rgba(248,113,113,0.12)';
-    el.style.color = '#f87171';
-    el.textContent = '미설정';
-  }
+  if (key) { el.style.background = 'rgba(74,222,128,0.12)'; el.style.color = '#4ade80'; el.textContent = '설정됨'; }
+  else { el.style.background = 'rgba(248,113,113,0.12)'; el.style.color = '#f87171'; el.textContent = '미설정'; }
 }
 
 async function callGemini(images, prompt) {
   const key = getApiKey();
   if (!key) throw new Error('API 키가 없습니다.');
-
-  const parts = images.map((img, i) => ({
-    inline_data: {
-      mime_type: i === 0 ? img1MediaType : img2MediaType,
-      data: img
-    }
-  }));
+  const parts = images.map((img, i) => ({ inline_data: { mime_type: i === 0 ? img1MediaType : img2MediaType, data: img } }));
   parts.push({ text: prompt });
-
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts }] })
   });
-  
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(`API 오류 ${res.status}: ${errData.error?.message || res.statusText}`);
-  }
-  
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(`API 오류 ${res.status}: ${e.error?.message || res.statusText}`); }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
   if (!text) throw new Error('응답 없음');
   return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
-function setStatus(type, msg) {
-  const s = document.getElementById('status');
-  s.className = 'status ' + type;
-  s.textContent = msg;
-}
-
-function getTodayStr() {
-  const d = new Date();
-  return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function updateExtractBtn() {
-  document.getElementById('extractBtn').disabled = !img1Base64;
-}
+function setStatus(type, msg) { const s = document.getElementById('status'); s.className = 'status ' + type; s.textContent = msg; }
+function getTodayStr() { const d = new Date(); return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+function updateExtractBtn() { document.getElementById('extractBtn').disabled = !img1Base64; }
 
 async function extractMulti() {
   if (!img1Base64) return;
-  if (!getApiKey()) {
-    setStatus('error', 'Gemini API 키를 먼저 입력해주세요.');
-    return;
-  }
+  if (!getApiKey()) { setStatus('error', 'Gemini API 키를 먼저 입력해주세요.'); return; }
   setStatus('loading', 'AI가 이미지에서 데이터를 읽는 중...');
   document.getElementById('extractedCard').style.display = 'none';
   const todayStr = getTodayStr();
   const images = img2Base64 ? [img1Base64, img2Base64] : [img1Base64];
   const imgDesc = img2Base64 ? '두 장의 이미지' : '이미지';
-
   try {
     const parsed = await callGemini(images, `${imgDesc}에서 체성분 수치를 모두 찾아 합쳐서 JSON 하나로 반환하세요. 반드시 JSON만, 다른 텍스트 없이.
-
 {"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null}
-
 - date: 이미지에서 날짜 찾아 YY.MM.DD 형식. 없으면 "${todayStr}"
 - device: InBody면 "InBody", ACCUNIQ이면 "ACCUNIQ"
-- weight: 체중(kg)
-- muscle: 골격근량(kg), 없으면 null
-- fat: 체지방량(kg), 없으면 null
-- fatpct: 체지방률(%), 없으면 null
-- 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로
-- 단위 제외, 숫자만`);
-
+- weight: 체중(kg), muscle: 골격근량(kg) 없으면 null, fat: 체지방량(kg) 없으면 null, fatpct: 체지방률(%) 없으면 null
+- 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로, 단위 제외 숫자만`);
     document.getElementById('f-date').value = parsed.date ?? todayStr;
     document.getElementById('f-device').value = parsed.device ?? 'InBody';
     document.getElementById('f-weight').value = parsed.weight ?? '';
     document.getElementById('f-muscle').value = parsed.muscle ?? '';
     document.getElementById('f-fat').value = parsed.fat ?? '';
     document.getElementById('f-fatpct').value = parsed.fatpct ?? '';
-
     setStatus('success', '추출 완료 — 수치 확인 후 저장해주세요');
     document.getElementById('extractedCard').style.display = 'block';
   } catch(e) {
@@ -856,26 +628,15 @@ async function saveRecord() {
   const muscle = parseFloat(document.getElementById('f-muscle').value) || null;
   const fat = parseFloat(document.getElementById('f-fat').value);
   const fatpct = parseFloat(document.getElementById('f-fatpct').value);
-
-  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) {
-    setStatus('error', '날짜, 체중, 지방량, 체지방률은 필수입니다');
-    return;
-  }
-
+  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) { setStatus('error', '날짜, 체중, 지방량, 체지방률은 필수입니다'); return; }
   const existing = records.findIndex(r => r.date === date && r.device === device);
   const rec = { date, device, weight, muscle, fat, fatpct };
-
-  if (existing >= 0) {
-    if (!confirm(`${date} ${device} 기록이 이미 있습니다. 덮어쓸까요?`)) return;
-    records[existing] = rec;
-  } else {
-    records.push(rec);
-  }
+  if (existing >= 0) { if (!confirm(`${date} ${device} 기록이 이미 있습니다. 덮어쓸까요?`)) return; records[existing] = rec; }
+  else records.push(rec);
   records.sort((a,b) => a.date.localeCompare(b.date));
   await saveRecords();
   setStatus('success', `${date} ${device} 저장 완료`);
-  renderAll();
-  setTimeout(resetUpload, 1500);
+  renderAll(); setTimeout(resetUpload, 1500);
 }
 
 function resetUpload() {
@@ -889,6 +650,7 @@ function resetUpload() {
   document.getElementById('extractBtn').disabled = true;
   document.getElementById('status').className = 'status';
 }
+
 async function runAnalysis() {
   const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
   if (ib.length < 3) {
@@ -897,55 +659,38 @@ async function runAnalysis() {
     document.getElementById('analysisStatus').style.display = 'block';
     return;
   }
- 
   document.getElementById('analysisStatus').className = 'status loading';
   document.getElementById('analysisStatus').textContent = 'AI가 데이터를 분석하는 중...';
   document.getElementById('analysisStatus').style.display = 'block';
   document.getElementById('analysisResult').innerHTML = '';
   document.getElementById('analysisBtn').disabled = true;
- 
+
   const last = ib[ib.length-1];
   const prev = ib[ib.length-2];
- 
-  // ── 신뢰도 계산 ──────────────────────────────────────────
+
   function calcReliability(last, prev) {
     if (!prev) return { score: 100, reasons: [] };
- 
     const dateA = new Date(2000 + parseInt(prev.date.split('.')[0]), parseInt(prev.date.split('.')[1])-1, parseInt(prev.date.split('.')[2]));
     const dateB = new Date(2000 + parseInt(last.date.split('.')[0]), parseInt(last.date.split('.')[1])-1, parseInt(last.date.split('.')[2]));
     const days = Math.round((dateB - dateA) / 86400000);
-    const dow = dateB.getDay(); // 0=일, 1=월
- 
+    const dow = dateB.getDay();
     let score = 100;
     const reasons = [];
- 
     const dm = last.muscle != null && prev.muscle != null ? last.muscle - prev.muscle : 0;
     const df = last.fat - prev.fat;
     const dw = last.weight - prev.weight;
- 
-    // 골격근 급변
     if (Math.abs(dm) > 1.5) { score -= 35; reasons.push(`직전 대비 골격근 ${dm > 0 ? '+' : ''}${dm.toFixed(1)}kg — 단기 급변은 수분 변동 가능성 높음`); }
     else if (Math.abs(dm) > 0.8) { score -= 20; reasons.push(`직전 대비 골격근 ${dm > 0 ? '+' : ''}${dm.toFixed(1)}kg — 단기간 변화폭 주의`); }
- 
-    // 체지방 급변
     if (Math.abs(df) > 1.2 && days <= 3) { score -= 25; reasons.push(`${days}일 만에 체지방 ${df > 0 ? '+' : ''}${df.toFixed(1)}kg — 생리학적으로 실제 지방 변화 가능성 낮음`); }
     else if (Math.abs(df) > 0.8 && days <= 2) { score -= 15; reasons.push(`단기간 체지방 변화폭 (${df > 0 ? '+' : ''}${df.toFixed(1)}kg) — 수분 영향 의심`); }
- 
-    // 체중 vs 골격근+지방 불일치
     const expected = dm + df;
     if (Math.abs(dw - expected) > 1.0) { score -= 10; reasons.push(`체중 변화(${dw > 0 ? '+' : ''}${dw.toFixed(1)}kg)와 근육·지방 합산 불일치 — 측정 노이즈 가능`); }
- 
-    // 월요일 측정
     if (dow === 1) { score -= 10; reasons.push('월요일 측정 — 주말 식습관·수분 영향으로 노이즈 빈번'); }
- 
-    // 전날 고강도 운동 등 판단 불가 시 소폭 차감
-    if (score === 100 && reasons.length === 0) reasons.push('직전 대비 변화폭 정상 범위 — 신뢰도 양호');
- 
+    if (reasons.length === 0) reasons.push('직전 대비 변화폭 정상 범위 — 신뢰도 양호');
     score = Math.max(0, Math.min(100, score));
     return { score, reasons, days, dm, df };
   }
- 
-  // ── 전월 평균 계산 ────────────────────────────────────────
+
   function prevMonthAvg(last, ib) {
     const parts = last.date.split('.');
     let yr = parseInt(parts[0]), mo = parseInt(parts[1]);
@@ -959,90 +704,63 @@ async function runAnalysis() {
       month: `${yr}년 ${mo}월`,
       weight: +avg(prev.map(r => r.weight)).toFixed(1),
       muscle: prev.some(r => r.muscle) ? +avg(prev.filter(r => r.muscle).map(r => r.muscle)).toFixed(1) : null,
-      fat:    +avg(prev.map(r => r.fat)).toFixed(1),
+      fat: +avg(prev.map(r => r.fat)).toFixed(1),
       fatpct: +avg(prev.map(r => r.fatpct)).toFixed(1),
       n: prev.length
     };
   }
- 
+
   const rel = calcReliability(last, prev);
   const pmAvg = prevMonthAvg(last, ib);
- 
-  // ── 린벌크 구간 ───────────────────────────────────────────
   const bulk = ib.filter(r => r.date >= '26.01.01');
   const bulkStart = bulk[0];
- 
-  // 최근 7일
   const today = last.date;
   const d7 = new Date(2000 + parseInt(today.split('.')[0]), parseInt(today.split('.')[1])-1, parseInt(today.split('.')[2]));
   d7.setDate(d7.getDate() - 7);
   const d7str = `${String(d7.getFullYear()).slice(-2)}.${String(d7.getMonth()+1).padStart(2,'0')}.${String(d7.getDate()).padStart(2,'0')}`;
   const week = ib.filter(r => r.date >= d7str);
- 
+
   const dataStr = JSON.stringify({
-    린벌크시작: bulkStart,
-    린벌크최신: last,
-    린벌크직전: prev,
-    전월평균: pmAvg,
-    최근7일: week,
-    린벌크전체: bulk.slice(-20)
+    린벌크시작: bulkStart, 린벌크최신: last, 린벌크직전: prev,
+    전월평균: pmAvg, 최근7일: week, 린벌크전체: bulk.slice(-20)
   });
- 
+
   try {
     const prompt = `다음은 InBody 체성분 데이터입니다. 린벌크 중인 30대 남성(178cm)이며, 목표 체지방률 허용 상한은 13~14%입니다.
 린벌크 시작: 2026년 1월 5일 기준으로만 추세 분석하세요.
- 
+
 ${dataStr}
- 
+
 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
- 
 {
-  "trend": {
-    "grade": "good|caution|warn",
-    "title": "린벌크 추세 한 줄 요약 (26.01 시작 기준)",
-    "body": "린벌크 시작(26.01.05) 대비 현재까지 근육/지방 변화 분석. 전월 평균과 현재 수치 비교 포함. 3문장"
-  },
-  "week": {
-    "title": "최근 7일 변화",
-    "body": "최근 7일 체중/근육/지방 변화 2문장"
-  },
-  "warning": {
-    "grade": "good|caution|warn",
-    "title": "체지방 신호",
-    "badge": "정상범위|주의|경고",
-    "body": "현재 체지방률 추세 판단. 신뢰도 수치 감안하여 노이즈 여부도 언급. 2~3문장"
-  },
-  "advice": {
-    "title": "현시점 조언",
-    "body": "데이터 기반 구체적 행동 조언. 신뢰도가 낮으면 재측정 권고도 포함. 2~3문장"
-  }
+  "trend": { "grade": "good|caution|warn", "title": "린벌크 추세 한 줄 요약 (26.01 시작 기준)", "body": "린벌크 시작(26.01.05) 대비 현재까지 근육/지방 변화 분석. 전월 평균과 현재 수치 비교 포함. 3문장" },
+  "week": { "title": "최근 7일 변화", "body": "최근 7일 체중/근육/지방 변화 2문장" },
+  "warning": { "grade": "good|caution|warn", "title": "체지방 신호", "badge": "정상범위|주의|경고", "body": "현재 체지방률 추세 판단. 신뢰도 수치 감안하여 노이즈 여부도 언급. 2~3문장" },
+  "advice": { "title": "현시점 조언", "body": "데이터 기반 구체적 행동 조언. 신뢰도가 낮으면 재측정 권고도 포함. 2~3문장" }
 }`;
- 
+
     const key = getApiKey();
     if (!key) throw new Error('API 키 없음');
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
- 
-    // 신뢰도 색상
+
     const relColor = rel.score >= 80 ? '#4ade80' : rel.score >= 60 ? '#fbbf24' : '#f87171';
     const relBg    = rel.score >= 80 ? 'rgba(74,222,128,0.08)' : rel.score >= 60 ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.08)';
     const relBorder= rel.score >= 80 ? 'rgba(74,222,128,0.4)' : rel.score >= 60 ? 'rgba(251,191,36,0.4)' : 'rgba(248,113,113,0.4)';
     const relLabel = rel.score >= 80 ? '신뢰도 양호' : rel.score >= 60 ? '노이즈 주의' : '노이즈 가능성 높음';
- 
-    // 전월 비교 렌더링
+
     let pmHtml = '';
     if (pmAvg) {
       const dm = last.muscle != null && pmAvg.muscle != null ? (last.muscle - pmAvg.muscle).toFixed(1) : null;
       const df = (last.fat - pmAvg.fat).toFixed(1);
       const dp = (last.fatpct - pmAvg.fatpct).toFixed(1);
-      const sign = v => v > 0 ? `<span style="color:#f87171">+${v}</span>` : v < 0 ? `<span style="color:#4ade80">${v}</span>` : `<span style="color:#888">${v}</span>`;
-      const signM = v => v > 0 ? `<span style="color:#4ade80">+${v}</span>` : v < 0 ? `<span style="color:#f87171">${v}</span>` : `<span style="color:#888">${v}</span>`;
+      const sign = v => +v > 0 ? `<span style="color:#f87171">+${v}</span>` : +v < 0 ? `<span style="color:#4ade80">${v}</span>` : `<span style="color:#888">${v}</span>`;
+      const signM = v => +v > 0 ? `<span style="color:#4ade80">+${v}</span>` : +v < 0 ? `<span style="color:#f87171">${v}</span>` : `<span style="color:#888">${v}</span>`;
       pmHtml = `
         <table class="week-table" style="margin-top:.75rem">
           <thead><tr><th></th><th>${pmAvg.month} 평균 (${pmAvg.n}회)</th><th>현재 (${last.date})</th><th>변화</th></tr></thead>
@@ -1054,21 +772,11 @@ ${dataStr}
           </tbody>
         </table>`;
     }
- 
-    // 최근 7일 테이블
-    const weekRows = week.map(r => `
-      <tr>
-        <td>${r.date}</td>
-        <td>${r.weight}</td>
-        <td>${r.muscle ?? '-'}</td>
-        <td>${r.fat}</td>
-        <td>${r.fatpct}%</td>
-      </tr>`).join('');
- 
+
+    const weekRows = week.map(r => `<tr><td>${r.date}</td><td>${r.weight}</td><td>${r.muscle ?? '-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td></tr>`).join('');
     const gradeMap = { good: 'good', caution: 'caution', warn: 'warn' };
- 
+
     document.getElementById('analysisResult').innerHTML = `
-      <!-- 신뢰도 -->
       <div class="a-card" style="border-color:${relBorder};background:${relBg};margin-bottom:.75rem">
         <div class="a-card-title">🎯 금일 측정 신뢰도
           <span class="a-badge" style="background:${relBg};color:${relColor};border:1px solid ${relBorder}">${relLabel}</span>
@@ -1081,8 +789,6 @@ ${dataStr}
           ${rel.score < 75 ? '<p style="font-size:12px;color:#fbbf24;margin-top:.5rem">⚠ 신뢰도가 낮은 경우 단독 판단 기준으로 삼지 않는 것을 권장합니다.</p>' : ''}
         </div>
       </div>
- 
-      <!-- 린벌크 추세 -->
       <div class="a-card ${gradeMap[parsed.trend.grade] || 'info'}">
         <div class="a-card-title">📈 린벌크 추세 (26.01.05 기준)
           <span class="a-badge ${gradeMap[parsed.trend.grade]}">${parsed.trend.title}</span>
@@ -1090,8 +796,6 @@ ${dataStr}
         <div class="a-card-body">${parsed.trend.body}</div>
         ${pmHtml}
       </div>
- 
-      <!-- 최근 7일 -->
       <div class="a-card info">
         <div class="a-card-title">📅 최근 7일</div>
         <div class="a-card-body" style="margin-bottom:.75rem">${parsed.week.body}</div>
@@ -1100,43 +804,32 @@ ${dataStr}
           <tbody>${weekRows}</tbody>
         </table>
       </div>
- 
-      <!-- 체지방 신호 -->
       <div class="a-card ${gradeMap[parsed.warning.grade] || 'info'}">
         <div class="a-card-title">⚠️ 체지방 신호
           <span class="a-badge ${gradeMap[parsed.warning.grade]}">${parsed.warning.badge}</span>
         </div>
         <div class="a-card-body">${parsed.warning.body}</div>
       </div>
- 
-      <!-- 조언 -->
       <div class="a-card info">
         <div class="a-card-title">💡 현시점 조언</div>
         <div class="a-card-body">${parsed.advice.body}</div>
       </div>
     `;
- 
     document.getElementById('analysisStatus').style.display = 'none';
   } catch(e) {
     document.getElementById('analysisStatus').className = 'status error';
     document.getElementById('analysisStatus').textContent = '분석 실패 — 잠시 후 다시 시도해주세요';
   }
   document.getElementById('analysisBtn').disabled = false;
+}
+
 function exportXlsx() {
   if (!records.length) { alert('저장된 기록이 없습니다.'); return; }
   const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date));
-  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({
-    '날짜': r.date,
-    '체중': r.weight,
-    '근육': r.muscle ?? '',
-    '지방량': r.fat,
-    '지방률': r.fatpct,
-    '기기': r.device
-  })));
+  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({ '날짜': r.date, '체중': r.weight, '근육': r.muscle ?? '', '지방량': r.fat, '지방률': r.fatpct, '기기': r.device })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-  const today = getTodayStr().replace(/\./g, '');
-  XLSX.writeFile(wb, `체성분_${today}.xlsx`);
+  XLSX.writeFile(wb, `체성분_${getTodayStr().replace(/\./g, '')}.xlsx`);
 }
 
 function switchTab(id, btn) {
