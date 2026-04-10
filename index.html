@@ -889,7 +889,6 @@ function resetUpload() {
   document.getElementById('extractBtn').disabled = true;
   document.getElementById('status').className = 'status';
 }
-
 async function runAnalysis() {
   const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
   if (ib.length < 3) {
@@ -898,63 +897,127 @@ async function runAnalysis() {
     document.getElementById('analysisStatus').style.display = 'block';
     return;
   }
-
+ 
   document.getElementById('analysisStatus').className = 'status loading';
   document.getElementById('analysisStatus').textContent = 'AI가 데이터를 분석하는 중...';
   document.getElementById('analysisStatus').style.display = 'block';
   document.getElementById('analysisResult').innerHTML = '';
   document.getElementById('analysisBtn').disabled = true;
-
-  // 최근 7일 데이터
-  const today = ib[ib.length-1].date;
+ 
+  const last = ib[ib.length-1];
+  const prev = ib[ib.length-2];
+ 
+  // ── 신뢰도 계산 ──────────────────────────────────────────
+  function calcReliability(last, prev) {
+    if (!prev) return { score: 100, reasons: [] };
+ 
+    const dateA = new Date(2000 + parseInt(prev.date.split('.')[0]), parseInt(prev.date.split('.')[1])-1, parseInt(prev.date.split('.')[2]));
+    const dateB = new Date(2000 + parseInt(last.date.split('.')[0]), parseInt(last.date.split('.')[1])-1, parseInt(last.date.split('.')[2]));
+    const days = Math.round((dateB - dateA) / 86400000);
+    const dow = dateB.getDay(); // 0=일, 1=월
+ 
+    let score = 100;
+    const reasons = [];
+ 
+    const dm = last.muscle != null && prev.muscle != null ? last.muscle - prev.muscle : 0;
+    const df = last.fat - prev.fat;
+    const dw = last.weight - prev.weight;
+ 
+    // 골격근 급변
+    if (Math.abs(dm) > 1.5) { score -= 35; reasons.push(`직전 대비 골격근 ${dm > 0 ? '+' : ''}${dm.toFixed(1)}kg — 단기 급변은 수분 변동 가능성 높음`); }
+    else if (Math.abs(dm) > 0.8) { score -= 20; reasons.push(`직전 대비 골격근 ${dm > 0 ? '+' : ''}${dm.toFixed(1)}kg — 단기간 변화폭 주의`); }
+ 
+    // 체지방 급변
+    if (Math.abs(df) > 1.2 && days <= 3) { score -= 25; reasons.push(`${days}일 만에 체지방 ${df > 0 ? '+' : ''}${df.toFixed(1)}kg — 생리학적으로 실제 지방 변화 가능성 낮음`); }
+    else if (Math.abs(df) > 0.8 && days <= 2) { score -= 15; reasons.push(`단기간 체지방 변화폭 (${df > 0 ? '+' : ''}${df.toFixed(1)}kg) — 수분 영향 의심`); }
+ 
+    // 체중 vs 골격근+지방 불일치
+    const expected = dm + df;
+    if (Math.abs(dw - expected) > 1.0) { score -= 10; reasons.push(`체중 변화(${dw > 0 ? '+' : ''}${dw.toFixed(1)}kg)와 근육·지방 합산 불일치 — 측정 노이즈 가능`); }
+ 
+    // 월요일 측정
+    if (dow === 1) { score -= 10; reasons.push('월요일 측정 — 주말 식습관·수분 영향으로 노이즈 빈번'); }
+ 
+    // 전날 고강도 운동 등 판단 불가 시 소폭 차감
+    if (score === 100 && reasons.length === 0) reasons.push('직전 대비 변화폭 정상 범위 — 신뢰도 양호');
+ 
+    score = Math.max(0, Math.min(100, score));
+    return { score, reasons, days, dm, df };
+  }
+ 
+  // ── 전월 평균 계산 ────────────────────────────────────────
+  function prevMonthAvg(last, ib) {
+    const parts = last.date.split('.');
+    let yr = parseInt(parts[0]), mo = parseInt(parts[1]);
+    mo -= 1; if (mo < 1) { mo = 12; yr -= 1; }
+    const prefix = `${String(yr).padStart(2,'0')}.${String(mo).padStart(2,'0')}.`;
+    const bulk = ib.filter(r => r.date >= '26.01.01');
+    const prev = bulk.filter(r => r.date.startsWith(prefix));
+    if (!prev.length) return null;
+    const avg = arr => arr.reduce((s,v) => s+v, 0) / arr.length;
+    return {
+      month: `${yr}년 ${mo}월`,
+      weight: +avg(prev.map(r => r.weight)).toFixed(1),
+      muscle: prev.some(r => r.muscle) ? +avg(prev.filter(r => r.muscle).map(r => r.muscle)).toFixed(1) : null,
+      fat:    +avg(prev.map(r => r.fat)).toFixed(1),
+      fatpct: +avg(prev.map(r => r.fatpct)).toFixed(1),
+      n: prev.length
+    };
+  }
+ 
+  const rel = calcReliability(last, prev);
+  const pmAvg = prevMonthAvg(last, ib);
+ 
+  // ── 린벌크 구간 ───────────────────────────────────────────
+  const bulk = ib.filter(r => r.date >= '26.01.01');
+  const bulkStart = bulk[0];
+ 
+  // 최근 7일
+  const today = last.date;
   const d7 = new Date(2000 + parseInt(today.split('.')[0]), parseInt(today.split('.')[1])-1, parseInt(today.split('.')[2]));
   d7.setDate(d7.getDate() - 7);
   const d7str = `${String(d7.getFullYear()).slice(-2)}.${String(d7.getMonth()+1).padStart(2,'0')}.${String(d7.getDate()).padStart(2,'0')}`;
   const week = ib.filter(r => r.date >= d7str);
-
-  // 린벌크 구간
-  const bulk = ib.filter(r => r.date >= '26.01.01');
-  const last = ib[ib.length-1];
-  const prev = ib[ib.length-2];
-
+ 
   const dataStr = JSON.stringify({
-    전체InBody수: ib.length,
-    린벌크시작: bulk.length > 0 ? bulk[0] : null,
+    린벌크시작: bulkStart,
     린벌크최신: last,
     린벌크직전: prev,
+    전월평균: pmAvg,
     최근7일: week,
     린벌크전체: bulk.slice(-20)
   });
-
+ 
   try {
-    const prompt = `다음은 InBody 체성분 측정 데이터입니다. 린벌크 중인 30대 남성(178cm)의 데이터로, 목표 체지방률 허용 범위는 12~13%입니다.
-
+    const prompt = `다음은 InBody 체성분 데이터입니다. 린벌크 중인 30대 남성(178cm)이며, 목표 체지방률 허용 상한은 13~14%입니다.
+린벌크 시작: 2026년 1월 5일 기준으로만 추세 분석하세요.
+ 
 ${dataStr}
-
+ 
 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
-
+ 
 {
   "trend": {
     "grade": "good|caution|warn",
-    "title": "린벌크 추세 한 줄 요약",
-    "body": "2~3문장 분석. 근육증가속도, 지방변화, 전반적 방향성"
+    "title": "린벌크 추세 한 줄 요약 (26.01 시작 기준)",
+    "body": "린벌크 시작(26.01.05) 대비 현재까지 근육/지방 변화 분석. 전월 평균과 현재 수치 비교 포함. 3문장"
   },
   "week": {
-    "title": "최근 7일 변화 요약",
-    "body": "최근 7일 체중/근육/지방 변화 분석 2문장"
+    "title": "최근 7일 변화",
+    "body": "최근 7일 체중/근육/지방 변화 2문장"
   },
   "warning": {
     "grade": "good|caution|warn",
-    "title": "체지방 신호 판단",
+    "title": "체지방 신호",
     "badge": "정상범위|주의|경고",
-    "body": "지방 상승이 실제 지방인지 수분/노이즈인지 판단. 식단 변경 필요 여부 포함. 2~3문장"
+    "body": "현재 체지방률 추세 판단. 신뢰도 수치 감안하여 노이즈 여부도 언급. 2~3문장"
   },
   "advice": {
     "title": "현시점 조언",
-    "body": "현재 데이터 기반 구체적 행동 조언 2~3문장"
+    "body": "데이터 기반 구체적 행동 조언. 신뢰도가 낮으면 재측정 권고도 포함. 2~3문장"
   }
 }`;
-
+ 
     const key = getApiKey();
     if (!key) throw new Error('API 키 없음');
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`, {
@@ -965,8 +1028,34 @@ ${dataStr}
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-
-    // 최근 7일 테이블 생성
+ 
+    // 신뢰도 색상
+    const relColor = rel.score >= 80 ? '#4ade80' : rel.score >= 60 ? '#fbbf24' : '#f87171';
+    const relBg    = rel.score >= 80 ? 'rgba(74,222,128,0.08)' : rel.score >= 60 ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.08)';
+    const relBorder= rel.score >= 80 ? 'rgba(74,222,128,0.4)' : rel.score >= 60 ? 'rgba(251,191,36,0.4)' : 'rgba(248,113,113,0.4)';
+    const relLabel = rel.score >= 80 ? '신뢰도 양호' : rel.score >= 60 ? '노이즈 주의' : '노이즈 가능성 높음';
+ 
+    // 전월 비교 렌더링
+    let pmHtml = '';
+    if (pmAvg) {
+      const dm = last.muscle != null && pmAvg.muscle != null ? (last.muscle - pmAvg.muscle).toFixed(1) : null;
+      const df = (last.fat - pmAvg.fat).toFixed(1);
+      const dp = (last.fatpct - pmAvg.fatpct).toFixed(1);
+      const sign = v => v > 0 ? `<span style="color:#f87171">+${v}</span>` : v < 0 ? `<span style="color:#4ade80">${v}</span>` : `<span style="color:#888">${v}</span>`;
+      const signM = v => v > 0 ? `<span style="color:#4ade80">+${v}</span>` : v < 0 ? `<span style="color:#f87171">${v}</span>` : `<span style="color:#888">${v}</span>`;
+      pmHtml = `
+        <table class="week-table" style="margin-top:.75rem">
+          <thead><tr><th></th><th>${pmAvg.month} 평균 (${pmAvg.n}회)</th><th>현재 (${last.date})</th><th>변화</th></tr></thead>
+          <tbody>
+            <tr><td>체중</td><td>${pmAvg.weight}kg</td><td>${last.weight}kg</td><td>${sign((last.weight-pmAvg.weight).toFixed(1))}kg</td></tr>
+            ${dm != null ? `<tr><td>골격근</td><td>${pmAvg.muscle}kg</td><td>${last.muscle}kg</td><td>${signM(dm)}kg</td></tr>` : ''}
+            <tr><td>체지방</td><td>${pmAvg.fat}kg</td><td>${last.fat}kg</td><td>${sign(df)}kg</td></tr>
+            <tr><td>체지방률</td><td>${pmAvg.fatpct}%</td><td>${last.fatpct}%</td><td>${sign(dp)}%p</td></tr>
+          </tbody>
+        </table>`;
+    }
+ 
+    // 최근 7일 테이블
     const weekRows = week.map(r => `
       <tr>
         <td>${r.date}</td>
@@ -975,15 +1064,34 @@ ${dataStr}
         <td>${r.fat}</td>
         <td>${r.fatpct}%</td>
       </tr>`).join('');
-
-    const gradeMap = { good: 'good', caution: 'caution', warn: 'warn', info: 'info' };
-
+ 
+    const gradeMap = { good: 'good', caution: 'caution', warn: 'warn' };
+ 
     document.getElementById('analysisResult').innerHTML = `
-      <div class="a-card ${gradeMap[parsed.trend.grade] || 'info'}">
-        <div class="a-card-title">📈 린벌크 추세 <span class="a-badge ${gradeMap[parsed.trend.grade]}">${parsed.trend.title}</span></div>
-        <div class="a-card-body">${parsed.trend.body}</div>
+      <!-- 신뢰도 -->
+      <div class="a-card" style="border-color:${relBorder};background:${relBg};margin-bottom:.75rem">
+        <div class="a-card-title">🎯 금일 측정 신뢰도
+          <span class="a-badge" style="background:${relBg};color:${relColor};border:1px solid ${relBorder}">${relLabel}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:${relColor};margin-left:auto">${rel.score}%</span>
+        </div>
+        <div class="a-card-body">
+          <ul style="padding-left:1rem;margin:0;display:flex;flex-direction:column;gap:4px">
+            ${rel.reasons.map(r => `<li style="font-size:12px;color:var(--text2)">${r}</li>`).join('')}
+          </ul>
+          ${rel.score < 75 ? '<p style="font-size:12px;color:#fbbf24;margin-top:.5rem">⚠ 신뢰도가 낮은 경우 단독 판단 기준으로 삼지 않는 것을 권장합니다.</p>' : ''}
+        </div>
       </div>
-
+ 
+      <!-- 린벌크 추세 -->
+      <div class="a-card ${gradeMap[parsed.trend.grade] || 'info'}">
+        <div class="a-card-title">📈 린벌크 추세 (26.01.05 기준)
+          <span class="a-badge ${gradeMap[parsed.trend.grade]}">${parsed.trend.title}</span>
+        </div>
+        <div class="a-card-body">${parsed.trend.body}</div>
+        ${pmHtml}
+      </div>
+ 
+      <!-- 최근 7일 -->
       <div class="a-card info">
         <div class="a-card-title">📅 최근 7일</div>
         <div class="a-card-body" style="margin-bottom:.75rem">${parsed.week.body}</div>
@@ -992,26 +1100,28 @@ ${dataStr}
           <tbody>${weekRows}</tbody>
         </table>
       </div>
-
+ 
+      <!-- 체지방 신호 -->
       <div class="a-card ${gradeMap[parsed.warning.grade] || 'info'}">
-        <div class="a-card-title">⚠️ 체지방 신호 <span class="a-badge ${gradeMap[parsed.warning.grade]}">${parsed.warning.badge}</span></div>
+        <div class="a-card-title">⚠️ 체지방 신호
+          <span class="a-badge ${gradeMap[parsed.warning.grade]}">${parsed.warning.badge}</span>
+        </div>
         <div class="a-card-body">${parsed.warning.body}</div>
       </div>
-
+ 
+      <!-- 조언 -->
       <div class="a-card info">
         <div class="a-card-title">💡 현시점 조언</div>
         <div class="a-card-body">${parsed.advice.body}</div>
       </div>
     `;
-
+ 
     document.getElementById('analysisStatus').style.display = 'none';
   } catch(e) {
     document.getElementById('analysisStatus').className = 'status error';
     document.getElementById('analysisStatus').textContent = '분석 실패 — 잠시 후 다시 시도해주세요';
   }
   document.getElementById('analysisBtn').disabled = false;
-}
-
 function exportXlsx() {
   if (!records.length) { alert('저장된 기록이 없습니다.'); return; }
   const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date));
