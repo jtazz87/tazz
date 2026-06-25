@@ -16,6 +16,9 @@
     --red: #f87171; --red-dim: rgba(248,113,113,0.12);
     --blue: #60a5fa; --blue-dim: rgba(96,165,250,0.12);
     --amber: #fbbf24; --amber-dim: rgba(251,191,36,0.1);
+    --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.12);
+    --cyan: #22d3ee; --cyan-dim: rgba(34,211,238,0.12);
+    --orange: #fb923c; --orange-dim: rgba(251,146,60,0.12);
     --radius: 10px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -38,6 +41,7 @@
   .extracted-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; display: none; }
   .extracted-card h4 { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .06em; }
   .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
+  .field-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 1rem; }
   .field { display: flex; flex-direction: column; gap: 4px; }
   .field label { font-size: 11px; color: var(--text2); }
   .field input, .field select { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 14px; font-family: 'DM Mono', monospace; outline: none; transition: border-color .15s; }
@@ -72,6 +76,10 @@
   .metric-toggle { display: flex; gap: 4px; margin-bottom: .75rem; flex-wrap: wrap; }
   .mt-btn { font-size: 11px; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border); background: none; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
   .mt-btn.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .gym-toggle { display: flex; gap: 4px; margin-bottom: .75rem; flex-wrap: wrap; align-items: center; }
+  .gym-label { font-size: 10px; color: var(--text3); margin-right: 4px; letter-spacing: .05em; }
+  .gym-btn { font-size: 11px; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border); background: none; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .gym-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; padding: 8px 10px; color: var(--text2); font-weight: 400; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
@@ -82,6 +90,10 @@
   .tag-bulk { background: var(--green-dim); color: var(--green); }
   .tag-inbody { background: rgba(251,191,36,0.12); color: var(--amber); }
   .tag-accuniq { background: var(--bg3); color: var(--text3); }
+  .tag-able { background: var(--purple-dim); color: var(--purple); }
+  .tag-doubles { background: var(--cyan-dim); color: var(--cyan); }
+  .tag-fitnessm { background: var(--orange-dim); color: var(--orange); }
+  .tag-gym-other { background: var(--bg3); color: var(--text3); }
   .empty { text-align: center; padding: 3rem; color: var(--text2); font-size: 13px; }
   .del-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; transition: all .15s; }
   .del-btn:hover { background: var(--red-dim); color: var(--red); }
@@ -108,6 +120,7 @@
   @media (max-width: 600px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .field-grid { grid-template-columns: repeat(2, 1fr); }
+    .field-grid-2 { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -124,7 +137,18 @@
     <button class="tab-btn" onclick="switchTab('history',this)">기록</button>
   </div>
 
+  <!-- UPLOAD PANEL -->
   <div class="panel active" id="panel-upload">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:1rem">
+      <p style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.05em">헬스장 관리</p>
+      <div id="gymManagement" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.6rem"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newGymInput" placeholder="헬스장 이름 입력"
+          onkeydown="if(event.key==='Enter')addGym()"
+          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:13px;outline:none">
+        <button class="btn btn-secondary" onclick="addGym()" style="font-size:12px;padding:6px 14px">+ 추가</button>
+      </div>
+    </div>
     <div id="apiKeySection" style="margin-bottom:1rem">
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
@@ -147,7 +171,7 @@
       <div class="upload-zone" style="padding:1.25rem" onclick="document.getElementById('xlsxInput').click()">
         <div class="icon" style="font-size:22px;margin-bottom:.4rem">📊</div>
         <h3 style="font-size:13px">엑셀 파일 업로드 (.xlsx)</h3>
-        <p style="font-size:11px">기존 체성분 기록 전체를 한 번에 가져옵니다<br>날짜/체중/근육/지방량/지방률/기기 컬럼 자동 인식 · 25.07.07 이전은 InBody로 자동 보정</p>
+        <p style="font-size:11px">기존 체성분 기록 전체를 한 번에 가져옵니다<br>날짜/체중/근육/지방량/지방률/기기/헬스장 컬럼 자동 인식 · 25.07.07 이전은 InBody로 자동 보정</p>
       </div>
       <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none">
       <div class="status" id="xlsxStatus"></div>
@@ -160,7 +184,7 @@
           <div class="upload-zone" style="padding:1rem" onclick="document.getElementById('img1Input').click()">
             <div class="icon" style="font-size:20px;margin-bottom:.3rem">📷</div>
             <h3 style="font-size:12px">1장 업로드</h3>
-            <p style="font-size:10px">체중/근육/지방량</p>
+            <p style="font-size:10px">체중/골격근량/체지방량</p>
           </div>
           <input type="file" id="img1Input" accept="image/*">
           <div id="preview1Wrap" style="display:none;margin-top:6px"><img id="preview1Img" style="width:100%;border-radius:6px;border:1px solid var(--border)"></div>
@@ -182,9 +206,12 @@
         <div class="field-grid">
           <div class="field"><label>날짜</label><input type="text" id="f-date" placeholder="26.03.20"></div>
           <div class="field"><label>기기</label><select id="f-device"><option value="InBody">InBody</option><option value="ACCUNIQ">ACCUNIQ</option></select></div>
+          <div class="field"><label>헬스장 (직접 입력)</label><input type="text" id="f-gym" placeholder="에이블짐"></div>
           <div class="field"><label>체중 (kg)</label><input type="number" id="f-weight" step="0.1"></div>
-          <div class="field"><label>근육량 (kg)</label><input type="number" id="f-muscle" step="0.1"></div>
-          <div class="field"><label>지방량 (kg)</label><input type="number" id="f-fat" step="0.1"></div>
+          <div class="field"><label>골격근량 (kg)</label><input type="number" id="f-muscle" step="0.1"></div>
+          <div class="field"><label>체지방량 (kg)</label><input type="number" id="f-fat" step="0.1"></div>
+        </div>
+        <div class="field-grid-2" style="margin-bottom:1rem">
           <div class="field"><label>체지방률 (%)</label><input type="number" id="f-fatpct" step="0.1"></div>
         </div>
         <div class="btn-row">
@@ -198,6 +225,7 @@
     </div>
   </div>
 
+  <!-- CHART PANEL -->
   <div class="panel" id="panel-chart">
     <div class="stats-grid" id="statsGrid"></div>
     <div class="metric-toggle" id="metricToggle">
@@ -206,6 +234,7 @@
       <button class="mt-btn" onclick="setMetric('fat',this)">지방량</button>
       <button class="mt-btn" onclick="setMetric('fatpct',this)">체지방률</button>
     </div>
+    <div class="gym-toggle" id="gymToggleChart"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center">
       <button class="mt-btn active" onclick="setRange('all',this)">전체</button>
       <button class="mt-btn" onclick="setRange('cut',this)">감량기만</button>
@@ -238,43 +267,92 @@
     </div>
   </div>
 
+  <!-- ANALYSIS PANEL -->
   <div class="panel" id="panel-analysis">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <div>
         <p style="font-size:13px;font-weight:500">AI 체성분 분석</p>
         <p style="font-size:11px;color:var(--text2);margin-top:2px">InBody 기준 · 신뢰도 / 린벌크 추세 / 경고신호 / 조언</p>
       </div>
       <button class="btn btn-primary" onclick="runAnalysis()" id="analysisBtn">분석 실행</button>
     </div>
+    <div class="gym-toggle" id="gymToggleAnalysis" style="margin-bottom:1rem"></div>
     <div class="status" id="analysisStatus"></div>
     <div id="analysisResult"></div>
   </div>
 
+  <!-- HISTORY PANEL -->
   <div class="panel" id="panel-history">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
       <span id="recordCount" style="font-size:13px;color:var(--text2)"></span>
       <div style="display:flex;gap:8px">
         <button class="btn btn-secondary" onclick="exportXlsx()">📥 엑셀 다운로드</button>
         <button class="btn btn-danger" onclick="clearAll()">전체 삭제</button>
       </div>
     </div>
+    <div class="gym-toggle" style="margin-bottom:.75rem" id="gymToggleHistory"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>날짜</th><th>기기</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th><th>페이즈</th><th></th></tr></thead>
+        <thead><tr><th>날짜</th><th>기기</th><th>헬스장</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th><th>페이즈</th><th></th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<script>
+<!-- EDIT MODAL -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:460px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <p style="font-size:14px;font-weight:500">기록 수정</p>
+      <button onclick="closeEdit()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div class="field-grid" style="margin-bottom:.75rem">
+      <div class="field"><label>날짜</label><input type="text" id="e-date" placeholder="26.03.20"></div>
+      <div class="field"><label>기기</label><select id="e-device"><option value="InBody">InBody</option><option value="ACCUNIQ">ACCUNIQ</option></select></div>
+      <div class="field"><label>헬스장</label><input type="text" id="e-gym" placeholder="에이블짐"></div>
+      <div class="field"><label>체중 (kg)</label><input type="number" id="e-weight" step="0.1"></div>
+      <div class="field"><label>골격근량 (kg)</label><input type="number" id="e-muscle" step="0.1"></div>
+      <div class="field"><label>체지방량 (kg)</label><input type="number" id="e-fat" step="0.1"></div>
+    </div>
+    <div class="field" style="margin-bottom:1rem;max-width:160px">
+      <label>체지방률 (%)</label><input type="number" id="e-fatpct" step="0.1">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveEdit()">저장</button>
+      <button class="btn btn-secondary" onclick="closeEdit()">취소</button>
+    </div>
+  </div>
+</div>
+
+
 const STORAGE_KEY = 'body-comp-records';
+const GYM_KEY = 'body-comp-gyms';
 let records = [];
+let gyms = [];
 let mainChart = null;
 let curMetric = 'weight';
 let curRange = 'all';
+let curGym = 'all';
 let customStart = '';
 let customEnd = '';
+
+function setGym(gym, btn, context) {
+  curGym = gym;
+  // update buttons in the clicked context
+  const containerId = context === 'chart' ? 'gymToggleChart' : context === 'analysis' ? 'gymToggleAnalysis' : 'gymToggleHistory';
+  document.querySelectorAll('#' + containerId + ' .gym-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // sync other panels
+  ['gymToggleChart','gymToggleAnalysis','gymToggleHistory'].forEach(id => {
+    if (id === containerId) return;
+    document.querySelectorAll('#' + id + ' .gym-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.trim() === (gym === 'all' ? '전체' : gym));
+    });
+  });
+  if (context === 'history') { renderHistory(); return; }
+  renderStats(); buildChart();
+}
 
 function setRange(range, btn) {
   curRange = range;
@@ -315,8 +393,12 @@ function resetCustomRange() {
   customStart = ''; customEnd = ''; buildChart();
 }
 
-function getFilteredRecords() {
-  const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
+function getFilteredRecords(gymFilter) {
+  const gym = gymFilter !== undefined ? gymFilter : curGym;
+  let ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
+  if (gym && gym !== 'all') {
+    ib = ib.filter(r => (r.gym || '') === gym);
+  }
   if (!ib.length) return [];
   if (curRange === 'all') return ib;
   if (curRange === 'cut') return ib.filter(r => getPhase(r.date) === 'cut');
@@ -337,15 +419,40 @@ function getFilteredRecords() {
 
 const METRIC_CONFIG = {
   weight: { label: '체중', unit: 'kg', key: 'weight', color: '#60a5fa', min: 55, max: 92 },
-  muscle: { label: '근육량', unit: 'kg', key: 'muscle', color: '#4ade80', min: 28, max: 38 },
-  fat:    { label: '지방량', unit: 'kg', key: 'fat', color: '#f87171', min: 0, max: 32 },
+  muscle: { label: '골격근량', unit: 'kg', key: 'muscle', color: '#4ade80', min: 28, max: 38 },
+  fat:    { label: '체지방량', unit: 'kg', key: 'fat', color: '#f87171', min: 0, max: 32 },
   fatpct: { label: '체지방률', unit: '%', key: 'fatpct', color: '#fbbf24', min: 5, max: 36 },
 };
 
 async function loadRecords() {
   try { const raw = localStorage.getItem(STORAGE_KEY); records = raw ? JSON.parse(raw) : []; }
   catch(e) { records = []; }
+  try { const raw = localStorage.getItem(GYM_KEY); gyms = raw ? JSON.parse(raw) : []; }
+  catch(e) { gyms = []; }
   renderAll();
+}
+
+async function saveGyms() {
+  try { localStorage.setItem(GYM_KEY, JSON.stringify(gyms)); }
+  catch(e) { console.error(e); }
+}
+
+async function addGym() {
+  const input = document.getElementById('newGymInput');
+  const name = input.value.trim();
+  if (!name || gyms.includes(name)) { input.value = ''; return; }
+  gyms.push(name);
+  await saveGyms();
+  input.value = '';
+  renderGymFilters();
+}
+
+async function removeGym(name) {
+  gyms = gyms.filter(g => g !== name);
+  if (curGym === name) curGym = 'all';
+  await saveGyms();
+  renderGymFilters();
+  renderStats(); buildChart(); renderHistory();
 }
 
 async function saveRecords() {
@@ -360,22 +467,71 @@ function getPhase(dateStr) {
   return parseInt(parts[0]) >= 26 ? 'bulk' : 'cut';
 }
 
-function renderAll() { renderHistory(); renderStats(); buildChart(); }
+function gymTag(gym) {
+  if (!gym) return `<span class="tag tag-gym-other">-</span>`;
+  const cls = gym === '에이블짐' ? 'tag-able' : gym === '더블에스' ? 'tag-doubles' : gym === '휘트니스엠' ? 'tag-fitnessm' : 'tag-gym-other';
+  return `<span class="tag ${cls}">${gym}</span>`;
+}
+
+function renderGymFilters() {
+  const contexts = [
+    { id: 'gymToggleChart', label: '헬스장', ctx: 'chart' },
+    { id: 'gymToggleAnalysis', label: '헬스장 필터', ctx: 'analysis' },
+    { id: 'gymToggleHistory', label: '헬스장', ctx: 'history' },
+  ];
+  contexts.forEach(({ id, label, ctx }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const allActive = curGym === 'all';
+    let html = `<span class="gym-label">${label}</span>`;
+    html += `<button class="gym-btn${allActive ? ' active' : ''}" onclick="setGym('all',this,'${ctx}')">전체</button>`;
+    gyms.forEach(gym => {
+      const active = curGym === gym;
+      html += `<button class="gym-btn${active ? ' active' : ''}" onclick="setGym('${gym}',this,'${ctx}')">${gym}</button>`;
+    });
+    if (gyms.length === 0) {
+      html += `<span style="font-size:11px;color:var(--text3);margin-left:4px">헬스장 없음 — 아래에서 추가</span>`;
+    }
+    el.innerHTML = html;
+    el.style.display = 'flex';
+  });
+
+  // render gym management UI
+  const mgmt = document.getElementById('gymManagement');
+  if (!mgmt) return;
+  const tags = gyms.map(g =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:12px">
+      ${g}
+      <button onclick="removeGym('${g}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0;line-height:1" title="삭제">✕</button>
+    </span>`
+  ).join('');
+  mgmt.innerHTML = tags || `<span style="font-size:11px;color:var(--text3)">아직 없음</span>`;
+}
+
+function renderAll() { renderGymFilters(); renderHistory(); renderStats(); buildChart(); }
 
 function renderHistory() {
   const tbody = document.getElementById('historyBody');
-  const sorted = [...records].sort((a,b) => b.date.localeCompare(a.date));
-  document.getElementById('recordCount').textContent = `총 ${records.length}개 기록`;
-  if (!sorted.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty">아직 데이터가 없습니다.</td></tr>`; return; }
+  let sorted = [...records].sort((a,b) => b.date.localeCompare(a.date));
+  // apply gym filter for history
+  if (curGym && curGym !== 'all') {
+    sorted = sorted.filter(r => (r.gym || '') === curGym);
+  }
+  document.getElementById('recordCount').textContent = `총 ${records.length}개 기록${curGym !== 'all' ? ` (${curGym} 필터)` : ''}`;
+  if (!sorted.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty">아직 데이터가 없습니다.</td></tr>`; return; }
   tbody.innerHTML = sorted.map(r => {
     const phase = getPhase(r.date);
     const orig_i = records.indexOf(r);
     return `<tr>
-      <td>${r.date}</td>
+      <td><span onclick="editRecord(${orig_i})" style="cursor:pointer;color:var(--blue);text-decoration:underline dotted;text-underline-offset:3px" title="클릭해서 수정">${r.date}</span></td>
       <td><span class="tag ${r.device==='InBody'?'tag-inbody':'tag-accuniq'}">${r.device}</span></td>
+      <td>${gymTag(r.gym)}</td>
       <td>${r.weight}</td><td>${r.muscle ?? '-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td>
       <td><span class="tag ${phase==='bulk'?'tag-bulk':'tag-cut'}">${phase==='bulk'?'린벌크':'감량'}</span></td>
-      <td><button class="del-btn" onclick="deleteRecord(${orig_i})">✕</button></td>
+      <td style="white-space:nowrap">
+        <button class="del-btn" onclick="editRecord(${orig_i})" title="수정" style="margin-right:2px">✏️</button>
+        <button class="del-btn" onclick="deleteRecord(${orig_i})">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -405,11 +561,11 @@ function renderStats() {
   const dp = (last.fatpct - first.fatpct).toFixed(1);
   const sign = v => v > 0 ? '+' : '';
   const cls = (v, posGood) => posGood ? (v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu') : (v < 0 ? 'pos' : v > 0 ? 'neg' : 'neu');
-  const rl = getRangeLabel();
+  const rl = getRangeLabel() + (curGym !== 'all' ? ` · ${curGym}` : '');
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat-card"><div class="val">${last.weight}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 체중</div><div class="chg ${cls(dw,false)}">${sign(dw)}${dw}kg (${rl})</div></div>
-    <div class="stat-card"><div class="val">${last.muscle ?? '-'}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 근육량</div><div class="chg ${dm!=null?cls(dm,true):'neu'}">${dm!=null?sign(dm)+dm+'kg ('+rl+')':'—'}</div></div>
-    <div class="stat-card"><div class="val">${last.fat}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 지방량</div><div class="chg ${cls(df,false)}">${sign(df)}${df}kg (${rl})</div></div>
+    <div class="stat-card"><div class="val">${last.muscle ?? '-'}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 골격근량</div><div class="chg ${dm!=null?cls(dm,true):'neu'}">${dm!=null?sign(dm)+dm+'kg ('+rl+')':'—'}</div></div>
+    <div class="stat-card"><div class="val">${last.fat}<span style="font-size:13px;font-weight:400">kg</span></div><div class="lbl">현재 체지방량</div><div class="chg ${cls(df,false)}">${sign(df)}${df}kg (${rl})</div></div>
     <div class="stat-card"><div class="val">${last.fatpct}<span style="font-size:13px;font-weight:400">%</span></div><div class="lbl">체지방률</div><div class="chg ${cls(dp,false)}">${sign(dp)}${dp}%p (${rl})</div></div>
   `;
 }
@@ -423,7 +579,8 @@ function setMetric(m, btn) {
 
 function buildChart() {
   const cfg = METRIC_CONFIG[curMetric];
-  document.getElementById('chartTitle').textContent = `${cfg.label} 추이 — InBody 기준`;
+  const gymLabel = curGym !== 'all' ? ` — ${curGym}` : '';
+  document.getElementById('chartTitle').textContent = `${cfg.label} 추이 — InBody 기준${gymLabel}`;
   const ib = getFilteredRecords();
   if (mainChart) { mainChart.destroy(); mainChart = null; }
   if (!ib.length) return;
@@ -450,7 +607,47 @@ function buildChart() {
   });
 }
 
-async function deleteRecord(i) {
+let editIdx = -1;
+
+function editRecord(i) {
+  editIdx = i;
+  const r = records[i];
+  document.getElementById('e-date').value = r.date;
+  document.getElementById('e-device').value = r.device;
+  document.getElementById('e-gym').value = r.gym || '';
+  document.getElementById('e-weight').value = r.weight;
+  document.getElementById('e-muscle').value = r.muscle ?? '';
+  document.getElementById('e-fat').value = r.fat;
+  document.getElementById('e-fatpct').value = r.fatpct;
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEdit() {
+  document.getElementById('editModal').style.display = 'none';
+  editIdx = -1;
+}
+
+async function saveEdit() {
+  if (editIdx < 0) return;
+  const date = document.getElementById('e-date').value.trim();
+  const device = document.getElementById('e-device').value;
+  const gym = document.getElementById('e-gym').value.trim();
+  const weight = parseFloat(document.getElementById('e-weight').value);
+  const muscle = parseFloat(document.getElementById('e-muscle').value) || null;
+  const fat = parseFloat(document.getElementById('e-fat').value);
+  const fatpct = parseFloat(document.getElementById('e-fatpct').value);
+  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) { alert('날짜, 체중, 체지방량, 체지방률은 필수입니다'); return; }
+  records[editIdx] = { date, device, gym, weight, muscle, fat, fatpct };
+  records.sort((a,b) => a.date.localeCompare(b.date));
+  await saveRecords();
+  closeEdit();
+  renderAll();
+}
+
+// close modal on backdrop click
+document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeEdit(); });
+
+
   if (!confirm('이 기록을 삭제할까요?')) return;
   records.splice(i, 1); await saveRecords(); renderAll();
 }
@@ -483,10 +680,11 @@ async function importXlsx(file) {
     const idx = {
       date: headers.findIndex(h => h.includes('날짜')),
       weight: headers.findIndex(h => h.includes('체중')),
-      muscle: headers.findIndex(h => h.includes('근육')),
+      muscle: headers.findIndex(h => h.includes('근육') || h.includes('골격근')),
       fat: headers.findIndex(h => h.includes('지방량')),
       fatpct: headers.findIndex(h => h.includes('지방률')),
       device: headers.findIndex(h => h.includes('기기')),
+      gym: headers.findIndex(h => h.includes('헬스장') || h.includes('gym')),
     };
     if (idx.date < 0 || idx.weight < 0) { setXlsxStatus('error', '날짜/체중 컬럼을 찾지 못했습니다.'); return; }
     const CUTOFF = '25.07.07';
@@ -504,7 +702,8 @@ async function importXlsx(file) {
       let device = idx.device >= 0 ? String(row[idx.device] ?? '').trim() : 'ACCUNIQ';
       if (!device) device = 'ACCUNIQ';
       if (dateRaw <= CUTOFF) device = 'InBody';
-      const rec = { date: dateRaw, device, weight, muscle, fat, fatpct };
+      const gym = idx.gym >= 0 ? String(row[idx.gym] ?? '').trim() : '';
+      const rec = { date: dateRaw, device, gym, weight, muscle, fat, fatpct };
       const existing = records.findIndex(r => r.date === dateRaw && r.device === device);
       if (existing >= 0) records[existing] = rec; else records.push(rec);
       imported++;
@@ -600,20 +799,28 @@ async function extractMulti() {
   const images = img2Base64 ? [img1Base64, img2Base64] : [img1Base64];
   const imgDesc = img2Base64 ? '두 장의 이미지' : '이미지';
   try {
-    const parsed = await callGemini(images, `${imgDesc}에서 체성분 수치를 모두 찾아 합쳐서 JSON 하나로 반환하세요. 반드시 JSON만, 다른 텍스트 없이.
+    const parsed = await callGemini(images, `${imgDesc}에서 InBody 또는 ACCUNIQ 체성분 측정 결과의 수치를 찾아 JSON 하나로 반환하세요. 반드시 JSON만, 다른 텍스트 없이.
+
 {"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null}
-- date: 이미지에서 날짜 찾아 YY.MM.DD 형식. 없으면 "${todayStr}"
-- device: InBody면 "InBody", ACCUNIQ이면 "ACCUNIQ"
-- weight: 체중(kg), muscle: 골격근량(kg) 없으면 null, fat: 체지방량(kg) 없으면 null, fatpct: 체지방률(%) 없으면 null
-- 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로, 단위 제외 숫자만`);
+
+각 필드 추출 기준:
+- date: 검사일시 또는 날짜 찾아 YY.MM.DD 형식. 없으면 "${todayStr}"
+- device: InBody 기기면 "InBody", ACCUNIQ 기기면 "ACCUNIQ"
+- weight: "체 중(kg)" 또는 "체중(kg)" 항목의 숫자값
+- muscle: "골격근량(kg)" 또는 "Skeletal Muscle Mass(kg)" 항목의 숫자값. 없으면 null
+- fat: "체지방량(kg)" 또는 "체지방(kg)" 또는 "Body Fat Mass(kg)" 항목의 숫자값. 없으면 null
+- fatpct: "체지방률(%)" 또는 "Percent Body Fat(%)" 항목의 숫자값. 없으면 null
+
+주의: 단백질(Protein), 무기질(Mineral), 체수분(Body Water)은 추출하지 않음. 단위 제외 숫자만. 두 이미지에 걸쳐 있으면 합쳐서 하나의 JSON으로.`);
     document.getElementById('f-date').value = parsed.date ?? todayStr;
     document.getElementById('f-device').value = parsed.device ?? 'InBody';
     document.getElementById('f-weight').value = parsed.weight ?? '';
     document.getElementById('f-muscle').value = parsed.muscle ?? '';
     document.getElementById('f-fat').value = parsed.fat ?? '';
     document.getElementById('f-fatpct').value = parsed.fatpct ?? '';
-    setStatus('success', '추출 완료 — 수치 확인 후 저장해주세요');
+    setStatus('success', '추출 완료 — 헬스장 입력 후 저장해주세요');
     document.getElementById('extractedCard').style.display = 'block';
+    document.getElementById('f-gym').focus();
   } catch(e) {
     setStatus('error', '추출 실패: ' + e.message);
     document.getElementById('f-date').value = todayStr;
@@ -624,18 +831,19 @@ async function extractMulti() {
 async function saveRecord() {
   const date = document.getElementById('f-date').value.trim();
   const device = document.getElementById('f-device').value;
+  const gym = document.getElementById('f-gym').value.trim();
   const weight = parseFloat(document.getElementById('f-weight').value);
   const muscle = parseFloat(document.getElementById('f-muscle').value) || null;
   const fat = parseFloat(document.getElementById('f-fat').value);
   const fatpct = parseFloat(document.getElementById('f-fatpct').value);
-  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) { setStatus('error', '날짜, 체중, 지방량, 체지방률은 필수입니다'); return; }
+  if (!date || isNaN(weight) || isNaN(fat) || isNaN(fatpct)) { setStatus('error', '날짜, 체중, 체지방량, 체지방률은 필수입니다'); return; }
   const existing = records.findIndex(r => r.date === date && r.device === device);
-  const rec = { date, device, weight, muscle, fat, fatpct };
+  const rec = { date, device, gym, weight, muscle, fat, fatpct };
   if (existing >= 0) { if (!confirm(`${date} ${device} 기록이 이미 있습니다. 덮어쓸까요?`)) return; records[existing] = rec; }
   else records.push(rec);
   records.sort((a,b) => a.date.localeCompare(b.date));
   await saveRecords();
-  setStatus('success', `${date} ${device} 저장 완료`);
+  setStatus('success', `${date} ${device}${gym ? ' · ' + gym : ''} 저장 완료`);
   renderAll(); setTimeout(resetUpload, 1500);
 }
 
@@ -649,24 +857,26 @@ function resetUpload() {
   document.getElementById('extractedCard').style.display = 'none';
   document.getElementById('extractBtn').disabled = true;
   document.getElementById('status').className = 'status';
+  document.getElementById('f-gym').value = '';
 }
 
 async function runAnalysis() {
-  const ib = records.filter(r => r.device === 'InBody').sort((a,b) => a.date.localeCompare(b.date));
-  if (ib.length < 3) {
+  const ib = getFilteredRecords(curGym).filter(r => getPhase(r.date) !== 'cut' || true);
+  const ibAll = ib;
+  if (ibAll.length < 3) {
     document.getElementById('analysisStatus').className = 'status error';
     document.getElementById('analysisStatus').textContent = 'InBody 기록이 3개 이상 필요합니다.';
     document.getElementById('analysisStatus').style.display = 'block';
     return;
   }
   document.getElementById('analysisStatus').className = 'status loading';
-  document.getElementById('analysisStatus').textContent = 'AI가 데이터를 분석하는 중...';
+  document.getElementById('analysisStatus').textContent = `AI가 데이터를 분석하는 중${curGym !== 'all' ? ` (${curGym})` : ''}...`;
   document.getElementById('analysisStatus').style.display = 'block';
   document.getElementById('analysisResult').innerHTML = '';
   document.getElementById('analysisBtn').disabled = true;
 
-  const last = ib[ib.length-1];
-  const prev = ib[ib.length-2];
+  const last = ibAll[ibAll.length-1];
+  const prev = ibAll[ibAll.length-2];
 
   function calcReliability(last, prev) {
     if (!prev) return { score: 100, reasons: [] };
@@ -711,22 +921,23 @@ async function runAnalysis() {
   }
 
   const rel = calcReliability(last, prev);
-  const pmAvg = prevMonthAvg(last, ib);
-  const bulk = ib.filter(r => r.date >= '26.01.01');
+  const pmAvg = prevMonthAvg(last, ibAll);
+  const bulk = ibAll.filter(r => r.date >= '26.01.01');
   const bulkStart = bulk[0];
   const today = last.date;
   const d7 = new Date(2000 + parseInt(today.split('.')[0]), parseInt(today.split('.')[1])-1, parseInt(today.split('.')[2]));
   d7.setDate(d7.getDate() - 7);
   const d7str = `${String(d7.getFullYear()).slice(-2)}.${String(d7.getMonth()+1).padStart(2,'0')}.${String(d7.getDate()).padStart(2,'0')}`;
-  const week = ib.filter(r => r.date >= d7str);
+  const week = ibAll.filter(r => r.date >= d7str);
 
+  const gymNote = curGym !== 'all' ? `\n분석 대상 헬스장: ${curGym} (해당 기기 기록만 포함됨)` : '';
   const dataStr = JSON.stringify({
     린벌크시작: bulkStart, 린벌크최신: last, 린벌크직전: prev,
     전월평균: pmAvg, 최근7일: week, 린벌크전체: bulk.slice(-20)
   });
 
   try {
-    const prompt = `다음은 InBody 체성분 데이터입니다. 린벌크 중인 30대 남성(178cm)이며, 목표 체지방률 허용 상한은 13~14%입니다.
+    const prompt = `다음은 InBody 체성분 데이터입니다. 린벌크 중인 30대 남성(177cm)이며, 목표 체지방률 허용 상한은 13~14%입니다.${gymNote}
 린벌크 시작: 2026년 1월 5일 기준으로만 추세 분석하세요.
 
 ${dataStr}
@@ -734,7 +945,7 @@ ${dataStr}
 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만.
 {
   "trend": { "grade": "good|caution|warn", "title": "린벌크 추세 한 줄 요약", "bulk_points": ["린벌크 시작(26.01.05) 대비 현재까지 핵심 변화 1가지", "추가 분석 포인트 1가지", "추가 분석 포인트 1가지"], "prev_points": ["전월 평균 대비 현재 수치 비교 핵심 1가지", "추가 비교 포인트 1가지"] },
-  "week": { "title": "최근 7일 변화", "body": "최근 7일 체중/근육/지방 변화 2문장" },
+  "week": { "title": "최근 7일 변화", "body": "최근 7일 체중/골격근/체지방 변화 2문장" },
   "warning": { "grade": "good|caution|warn", "title": "체지방 신호", "badge": "정상범위|주의|경고", "body": "현재 체지방률 추세 판단. 신뢰도 수치 감안하여 노이즈 여부도 언급. 2~3문장" },
   "advice": { "title": "현시점 조언", "body": "데이터 기반 구체적 행동 조언. 신뢰도가 낮으면 재측정 권고도 포함. 2~3문장" }
 }`;
@@ -773,8 +984,9 @@ ${dataStr}
         </table>`;
     }
 
-    const weekRows = week.map(r => `<tr><td>${r.date}</td><td>${r.weight}</td><td>${r.muscle ?? '-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td></tr>`).join('');
+    const weekRows = week.map(r => `<tr><td>${r.date}${r.gym ? ' · ' + r.gym : ''}</td><td>${r.weight}</td><td>${r.muscle ?? '-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td></tr>`).join('');
     const gradeMap = { good: 'good', caution: 'caution', warn: 'warn' };
+    const gymBadge = curGym !== 'all' ? `<span class="a-badge info" style="margin-left:auto">${curGym}</span>` : '';
 
     document.getElementById('analysisResult').innerHTML = `
       <div class="a-card" style="border-color:${relBorder};background:${relBg};margin-bottom:.75rem">
@@ -792,6 +1004,7 @@ ${dataStr}
       <div class="a-card ${gradeMap[parsed.trend.grade] || 'info'}">
         <div class="a-card-title">📈 린벌크 추세 (26.01.05 기준)
           <span class="a-badge ${gradeMap[parsed.trend.grade]}">${parsed.trend.title}</span>
+          ${gymBadge}
         </div>
         <div class="a-card-body">
           <p style="font-size:11px;color:var(--text2);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.04em">26.01.05 린벌크 시작 이후</p>
@@ -835,7 +1048,10 @@ ${dataStr}
 function exportXlsx() {
   if (!records.length) { alert('저장된 기록이 없습니다.'); return; }
   const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date));
-  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({ '날짜': r.date, '체중': r.weight, '근육': r.muscle ?? '', '지방량': r.fat, '지방률': r.fatpct, '기기': r.device })));
+  const ws = XLSX.utils.json_to_sheet(sorted.map(r => ({
+    '날짜': r.date, '체중': r.weight, '근육': r.muscle ?? '', '지방량': r.fat,
+    '지방률': r.fatpct, '기기': r.device, '헬스장': r.gym ?? ''
+  })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
   XLSX.writeFile(wb, `체성분_${getTodayStr().replace(/\./g, '')}.xlsx`);
