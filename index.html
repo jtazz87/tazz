@@ -940,8 +940,10 @@ function saveEdit() {
 
 // ── Analysis ───────────────────────────────────────────
 async function runAnalysis() {
-  const ib = getFilteredRecords();
-  if (ib.length < 3) { showStatus('analysisStatus','error','InBody 기록이 3개 이상 필요합니다.'); return; }
+  let ib = records.filter(r => r.device === 'InBody' || r.device === 'ACCUNIQ')
+    .sort((a,b) => a.date.localeCompare(b.date));
+  if (curGym && curGym !== 'all') ib = ib.filter(r => (r.gym||'') === curGym);
+  if (ib.length < 3) { showStatus('analysisStatus','error','기록이 3개 이상 필요합니다.'); return; }
   const key = getApiKey();
   if (!key) { showStatus('analysisStatus','error','Gemini API 키가 필요합니다.'); return; }
 
