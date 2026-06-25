@@ -595,10 +595,9 @@ function renderGymGoalToggles() {
 
   [['goalToggleChart','chart'],['goalToggleAnalysis','analysis'],['goalToggleHistory','history']].forEach(([id,ctx])=>{
     const el = document.getElementById(id);
-    if(!usedGoals.length){ el.style.display='none'; return; }
     el.style.display='flex';
     let html = `<span class="toggle-label">목표</span><button class="g-btn${curGoal==='all'?' active':''}" data-goal="all" data-ctx="${ctx}">전체</button>`;
-    usedGoals.forEach(g=>{ html+=`<button class="g-btn${curGoal===g?' active':''}" data-goal="${g}" data-ctx="${ctx}">${goalLabel(g)}</button>`; });
+    GOAL_TYPES.forEach(g=>{ html+=`<button class="g-btn${curGoal===g?' active':''}" data-goal="${g}" data-ctx="${ctx}">${goalLabel(g)}</button>`; });
     el.innerHTML = html;
     el.querySelectorAll('.g-btn').forEach(b=>b.addEventListener('click',()=>setGoalFilter(b.dataset.goal,b.dataset.ctx)));
   });
