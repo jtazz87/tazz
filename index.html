@@ -648,7 +648,7 @@ async function saveEdit() {
 // close modal on backdrop click
 document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeEdit(); });
 
-
+async function deleteRecord(i) {
   if (!confirm('이 기록을 삭제할까요?')) return;
   records.splice(i, 1); await saveRecords(); renderAll();
 }
