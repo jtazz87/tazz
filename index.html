@@ -415,6 +415,14 @@ let selectedImages = [];
   // Migration: 26.05.01~26.06.05 InBody → 더블에스휘트니스
   records.forEach(r => { if (r.device==='InBody' && r.date>='26.05.01' && r.date<='26.06.05') { r.gym='더블에스휘트니스'; migrated=true; } });
 
+  // Migration: goal 자동 태깅 (미설정 기록만)
+  records.forEach(r => {
+    if (!r.goal) {
+      r.goal = r.date < '26.01.01' ? '컷팅' : '린벌크';
+      migrated = true;
+    }
+  });
+
   if (migrated) saveRec();
 
   // Auto-register default gyms
