@@ -117,6 +117,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </style>
 </head>
 <body>
+<datalist id="gymList"></datalist>
 <div class="app">
   <h1>체성분 트래커</h1>
   <p class="sub">스크린샷 업로드 → AI 자동 추출 → 누적 저장</p>
@@ -201,7 +202,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <option value="ACCUNIQ">ACCUNIQ</option>
             </select>
           </div>
-          <div class="field"><label>헬스장</label><input id="f-gym" type="text" placeholder="에이블짐"></div>
+          <div class="field"><label>헬스장</label><input id="f-gym" type="text" placeholder="에이블짐" list="gymList" autocomplete="off"></div>
         </div>
         <div class="grid3" style="margin-bottom:.75rem">
           <div class="field"><label>체중 (kg)</label><input id="f-weight" type="number" step="0.1"></div>
@@ -323,7 +324,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <option value="ACCUNIQ">ACCUNIQ</option>
         </select>
       </div>
-      <div class="field"><label>헬스장</label><input id="e-gym" type="text"></div>
+      <div class="field"><label>헬스장</label><input id="e-gym" type="text" list="gymList" autocomplete="off"></div>
     </div>
     <div class="grid3" style="margin-bottom:.75rem">
       <div class="field"><label>체중 (kg)</label><input id="e-weight" type="number" step="0.1"></div>
@@ -365,6 +366,40 @@ let selectedImages = []; // [{base64, mediaType, url}]
 (function init() {
   try { records = JSON.parse(localStorage.getItem(REC_KEY) || '[]'); } catch(e) { records = []; }
   try { gyms    = JSON.parse(localStorage.getItem(GYM_KEY) || '[]'); } catch(e) { gyms = []; }
+  // 기존 ACCUNIQ 기록 중 헬스장 미설정인 것 → 바이젝으로 일괄 업데이트
+  let migrated = false;
+  records.forEach(r => {
+    if (r.device === 'ACCUNIQ' && !r.gym) {
+      r.gym = '바이젝';
+      migrated = true;
+    }
+  });
+  // 26년 6월 특정 날짜 → 휘트니스엠 마포
+  const fitnessMDates = new Set([
+    '26.06.09','26.06.11','26.06.12','26.06.15',
+    '26.06.17','26.06.19','26.06.22','26.06.23'
+  ]);
+  records.forEach(r => {
+    if (fitnessMDates.has(r.date) && r.device === 'InBody') {
+      r.gym = '휘트니스엠 마포'; migrated = true;
+    }
+  });
+
+  // 26년 5월1일 ~ 6월5일 InBody → 더블에스휘트니스
+  records.forEach(r => {
+    if (r.device === 'InBody' && r.date >= '26.05.01' && r.date <= '26.06.05') {
+      r.gym = '더블에스휘트니스'; migrated = true;
+    }
+  });
+
+  if (migrated) save();
+
+  // 헬스장 자동 등록
+  ['바이젝','휘트니스엠 마포','더블에스휘트니스'].forEach(g => {
+    if (!gyms.includes(g)) { gyms.push(g); }
+  });
+  saveGyms();
+
   bindEvents();
   updateApiKeyBadge();
   renderAll();
@@ -451,7 +486,9 @@ function switchTab(id, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'chart') { renderStats(); buildChart(); }
+  renderGymUI();
+  if (id === 'chart')   { renderStats(); buildChart(); }
+  if (id === 'history') { renderHistory(); }
 }
 
 // ── Gym Management ─────────────────────────────────────
@@ -474,6 +511,9 @@ function removeGym(name) {
 }
 
 function renderGymUI() {
+  // update datalist for autocomplete
+  document.getElementById('gymList').innerHTML = gyms.map(g => `<option value="${g}">`).join('');
+
   // gym tags in management
   const tagsEl = document.getElementById('gymTags');
   tagsEl.innerHTML = gyms.length
