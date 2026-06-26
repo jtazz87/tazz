@@ -782,12 +782,25 @@ async function doExtract() {
   document.getElementById('extractBtn').disabled=true;
   const parts = selectedImages.map(img=>({inline_data:{mime_type:img.mediaType,data:img.base64}}));
   const today = todayStr();
-  parts.push({text:`이미지(${selectedImages.length}장)에서 InBody/ACCUNIQ 체성분 수치 추출. 여러 장이면 합쳐서 하나로. JSON만 반환.
-{"date":"YY.MM.DD","device":"InBody 또는 ACCUNIQ","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null,"bmr":숫자또는null,"water":숫자또는null}
-- date: 검사일시(없으면 "${today}") - device: 기기 브랜드
-- weight: 체중(kg) - muscle: 골격근량(kg) - fat: 체지방량(kg)
-- fatpct: 체지방률(%) - bmr: 기초대사량(kcal) - water: 체수분(L)
-단백질·무기질 제외. 없는 항목은 null. 숫자만.`});
+parts.push({text:`아래 이미지(${selectedImages.length}장)는 InBody 또는 ACCUNIQ 체성분 측정 결과입니다. 앱 스크린샷이거나 인쇄된 A4 용지 사진일 수 있습니다. 모든 이미지를 꼼꼼히 읽어 6개 수치를 추출하세요. 반드시 JSON만 반환하고 다른 텍스트는 쓰지 마세요.
+
+{"date":"YY.MM.DD","device":"InBody","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null,"bmr":숫자또는null,"water":숫자또는null}
+
+각 항목 찾는 방법:
+1. date: 검사일시 날짜. "2026.06.25 19:18" 이면 "26.06.25". 없으면 "${today}"
+2. device: InBody 로고나 InBody570 등 기재 → "InBody". ACCUNIQ → "ACCUNIQ"
+3. weight: "체중(kg)" 또는 "Weight(kg)" 항목의 수치. 골격근·지방분석 표에서 체중 행의 숫자 (예: 68.1)
+4. muscle: "골격근량(kg)" 또는 "Skeletal Muscle Mass(kg)" 수치 (예: 33.8)
+5. fat: "체지방량(kg)" 또는 "Body Fat Mass(kg)" 수치 (예: 8.1). 체성분분석 표 하단 체지방 행
+6. fatpct: "체지방률(%)" 또는 "Percent Body Fat(%)" 수치. 비만분석 섹션에 있음 (예: 11.8)
+7. bmr: "기초대사량(kcal)" 수치. 연구항목 섹션 또는 우측 표에 있음 (예: 1667)
+8. water: "체수분(L)" 또는 "Total Body Water(L)" 수치. 체성분분석 표 상단 (예: 44.0)
+
+주의사항:
+- 단백질(Protein), 무기질(Minerals), BMI는 추출하지 않음
+- 광고·팝업은 무시
+- 수치가 보이지 않으면 null
+- 단위 제외하고 숫자만`});
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts}]})
