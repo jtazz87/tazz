@@ -427,6 +427,10 @@ let selectedImages = [];
 
   // Auto-register default gyms
   ['바이젝','휘트니스엠 마포','더블에스휘트니스'].forEach(g => { if (!gyms.includes(g)) gyms.push(g); });
+
+  // Auto-register any gym found in records but not in gyms list
+  records.forEach(r => { if (r.gym && !gyms.includes(r.gym)) gyms.push(r.gym); });
+
   saveGyms();
 
   bindEvents();
@@ -1182,7 +1186,7 @@ JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_poin
       </div>`;
     document.getElementById('analysisStatus').className='status';
   } catch(e) {
-    showStatus('analysisStatus','error','분석 실패 — 잠시 후 다시 시도해주세요');
+    showStatus('analysisStatus','error','분석 실패: ' + e.message);
   }
   document.getElementById('analysisBtn').disabled=false;
 }
