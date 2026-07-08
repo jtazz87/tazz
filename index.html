@@ -108,11 +108,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .wk-table th:first-child{text-align:left}
 .wk-table td{padding:5px 6px;text-align:right;border-bottom:.5px solid var(--border);font-family:'DM Mono',monospace;font-size:12px}
 .wk-table td:first-child{text-align:left;color:var(--text2);font-family:inherit}
-.trend-table{width:100%;border-collapse:collapse;font-size:12px}
-.trend-table th{padding:6px 8px;text-align:center;color:var(--text2);font-weight:400;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.trend-table{width:100%;border-collapse:collapse;font-size:11px}
+.trend-table th{padding:5px 4px;text-align:center;color:var(--text2);font-weight:400;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)}
 .trend-table th:first-child{text-align:left}
-.trend-table td{padding:7px 8px;text-align:center;border-bottom:.5px solid var(--border);font-family:'DM Mono',monospace;font-size:12px}
-.trend-table td:first-child{text-align:left;font-family:'Noto Sans KR',sans-serif;color:var(--text2);font-size:12px}
+.trend-table td{padding:5px 4px;text-align:center;border-bottom:.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px}
+.trend-table td:first-child{text-align:left;font-family:'Noto Sans KR',sans-serif;color:var(--text2);font-size:11px}
 .goal-progress{display:flex;flex-direction:column;gap:6px;margin-top:.5rem}
 .goal-row{display:flex;align-items:center;gap:8px;font-size:12px}
 .goal-row .gr-label{color:var(--text2);width:55px;flex-shrink:0;font-size:11px}
@@ -128,10 +128,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .divider{display:flex;align-items:center;gap:10px;margin:.75rem 0}
 .divider-line{flex:1;height:1px;background:var(--border)}
 .divider-text{font-size:11px;color:var(--text3);white-space:nowrap}
-.offset-table{width:100%;border-collapse:collapse;font-size:12px}
-.offset-table th{padding:5px 8px;color:var(--text2);font-weight:400;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left}
-.offset-table td{padding:5px 4px;border-bottom:.5px solid var(--border)}
-.offset-input{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 7px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;outline:none;width:70px;text-align:right}
+.offset-table{width:100%;border-collapse:collapse;font-size:11px}
+.offset-table th{padding:5px 6px;color:var(--text2);font-weight:400;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left}
+.offset-table td{padding:4px 4px;border-bottom:.5px solid var(--border)}
+.offset-input{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 5px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;outline:none;width:58px;text-align:right}
 .offset-input:focus{border-color:var(--green)}
 @media(max-width:480px){.grid3{grid-template-columns:1fr 1fr}.grid4{grid-template-columns:1fr 1fr}}
 </style>
@@ -143,8 +143,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <p class="sub">스크린샷 업로드 → AI 자동 추출 → 누적 저장</p>
   <div class="tabs">
     <button class="tab-btn active" data-tab="upload">측정 추가</button>
-    <button class="tab-btn" data-tab="chart">차트</button>
     <button class="tab-btn" data-tab="analysis">분석</button>
+    <button class="tab-btn" data-tab="chart">차트</button>
     <button class="tab-btn" data-tab="history">기록</button>
   </div>
 
@@ -280,39 +280,25 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
   <!-- ===== CHART ===== -->
   <div class="panel" id="panel-chart">
-    <div class="stats-grid" id="statsGrid"></div>
-    <div class="toggle-row">
-      <button class="t-btn active" data-metric="weight">체중</button>
-      <button class="t-btn" data-metric="muscle">골격근량</button>
-      <button class="t-btn" data-metric="fat">체지방량</button>
-      <button class="t-btn" data-metric="fatpct">체지방률</button>
-      <button class="t-btn" data-metric="bmr">기초대사량</button>
+    <div style="margin-bottom:.6rem">
+      <p style="font-size:13px;font-weight:500">체성분 추세 그래프</p>
+      <p style="font-size:11px;color:var(--text2);margin-top:1px">분석탭 헬스장·목표·기간 필터 공유 · 기기 보정 적용</p>
     </div>
     <div class="toggle-row" id="gymToggleChart"><span class="toggle-label">헬스장</span></div>
     <div class="toggle-row" id="goalToggleChart"><span class="toggle-label">목표</span></div>
-    <div class="toggle-row" id="rangeRow">
-      <button class="t-btn active" data-range="all">전체</button>
-      <button class="t-btn" data-range="cut">감량기</button>
-      <button class="t-btn" data-range="bulk">린벌크</button>
-      <button class="t-btn" data-range="3m">3개월</button>
-      <button class="t-btn" data-range="1m">1개월</button>
-      <button class="t-btn" data-range="custom">직접</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem;flex-wrap:wrap">
+      <span class="toggle-label">기간</span>
+      <select id="chartStartMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-size:12px;outline:none"></select>
+      <span style="font-size:11px;color:var(--text3)">~</span>
+      <select id="chartEndMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-size:12px;outline:none"></select>
     </div>
-    <div id="customRangeWrap" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:.6rem">
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <div class="field" style="flex:1;min-width:120px"><label>시작일</label><input id="rangeStart" type="text" placeholder="24.10.14"></div>
-        <div class="field" style="flex:1;min-width:120px"><label>종료일</label><input id="rangeEnd" type="text" placeholder="26.06.25"></div>
-      </div>
+    <div class="chart-card" style="margin-bottom:.75rem">
+      <div style="font-size:11px;color:var(--text2);font-weight:500;margin-bottom:.6rem">골격근량 (kg) — 월별 평균</div>
+      <div class="chart-wrap"><canvas id="muscleChart"></canvas></div>
     </div>
     <div class="chart-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-        <span id="chartTitle" style="font-size:12px;color:var(--text2);font-weight:500"></span>
-        <div style="display:flex;gap:10px">
-          <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)"><span style="width:8px;height:8px;border-radius:2px;background:#60a5fa;display:inline-block"></span>감량기</span>
-          <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)"><span style="width:8px;height:8px;border-radius:2px;background:#4ade80;display:inline-block"></span>린벌크</span>
-        </div>
-      </div>
-      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+      <div style="font-size:11px;color:var(--text2);font-weight:500;margin-bottom:.6rem">체지방량 (kg) — 월별 평균</div>
+      <div class="chart-wrap"><canvas id="fatChart"></canvas></div>
     </div>
   </div>
 
@@ -485,6 +471,8 @@ function goalLabel(g)  { return g==='눈바디개선'?'눈바디 개선':g||''; 
 function goalTagClass(g){ return g==='컷팅'?'tag-cut':g==='린벌크'?'tag-bulk':g==='더티벌크'?'tag-dirty':g==='눈바디개선'?'tag-body':''; }
 
 function applyOffset(r) {
+  // 바이젝(ACCUNIQ)은 보정 없이 그대로
+  if (r.device === 'ACCUNIQ' || r.gym === '바이젝') return { ...r };
   const off = offsets[r.gym] || { muscle: 0, fat: 0 };
   return {
     ...r,
@@ -575,6 +563,8 @@ function bindEvents() {
   document.getElementById('analysisBtn').addEventListener('click', runAnalysis);
   document.getElementById('trendStartMonth').addEventListener('change', e=>{ trendStartMonth=e.target.value; renderMonthlyTrend(); });
   document.getElementById('trendEndMonth').addEventListener('change',   e=>{ trendEndMonth  =e.target.value; renderMonthlyTrend(); });
+  document.getElementById('chartStartMonth').addEventListener('change', ()=>renderCharts());
+  document.getElementById('chartEndMonth').addEventListener('change',   ()=>renderCharts());
 
   document.getElementById('exportBtn').addEventListener('click', exportXlsx);
   document.getElementById('clearAllBtn').addEventListener('click', ()=>{
@@ -593,7 +583,7 @@ function switchTab(id, btn) {
   document.getElementById('panel-'+id).classList.add('active');
   btn.classList.add('active');
   renderGymGoalToggles();
-  if (id==='chart')    { renderStats(); buildChart(); }
+  if (id==='chart')    { renderCharts(); }
   if (id==='history')  { renderHistory(); }
   if (id==='analysis') { renderMonthlyTrend(); }
 }
@@ -635,12 +625,14 @@ function setGym(gym, ctx) {
   curGym=gym; renderGymGoalToggles();
   if(ctx==='history'){ renderHistory(); return; }
   if(ctx==='analysis'){ renderMonthlyTrend(); return; }
-  renderStats(); buildChart();
+  if(ctx==='chart'){ renderCharts(); return; }
+  renderMonthlyTrend();
 }
 function setGoalFilter(goal, ctx) {
   curGoal=goal; renderGymGoalToggles();
   if(ctx==='history'){ renderHistory(); return; }
-  renderStats(); buildChart();
+  if(ctx==='chart'){ renderCharts(); return; }
+  renderMonthlyTrend();
 }
 
 function addGym() {
@@ -660,21 +652,28 @@ function removeGym(name) {
 // ── Offset Table ───────────────────────────────────────
 function renderOffsetTable() {
   const tbody = document.getElementById('offsetTableBody');
-  const nonRef = gyms.filter(g=>g!==REF_GYM);
-  if (!nonRef.length) { tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);font-size:11px;padding:6px 8px">헬스장을 추가하면 보정값 설정 가능</td></tr>'; return; }
-  tbody.innerHTML = nonRef.map(g => {
+  // 기록에 있는 헬스장 + gyms 배열 합쳐서 기준 헬스장 제외
+  const fromRecords = [...new Set(records.map(r=>r.gym).filter(Boolean))];
+  const allGyms = [...new Set([...gyms, ...fromRecords])].filter(Boolean).sort();
+  if (!allGyms.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);font-size:11px;padding:6px 8px">헬스장을 추가하면 보정값 설정 가능</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allGyms.map(g => {
     const off = offsets[g] || { muscle:0, fat:0 };
+    const isRef = (g === REF_GYM);
+    const isBaijeck = (g === '바이젝');
     return `<tr>
-      <td style="padding:5px 8px;font-size:12px;color:var(--text)">${g}</td>
+      <td style="padding:5px 8px;font-size:12px;color:var(--text)">${g}${isRef?'<span style="font-size:10px;color:var(--amber);margin-left:4px">기준</span>':''}${isBaijeck?'<span style="font-size:10px;color:var(--text3);margin-left:4px">(보정 미적용)</span>':''}</td>
       <td style="text-align:center">
-        <input class="offset-input" data-gym="${g}" data-field="muscle" type="number" step="0.05" value="${off.muscle}">
+        <input class="offset-input" data-gym="${g}" data-field="muscle" type="number" step="0.05" value="${off.muscle}" ${isBaijeck?'disabled style="opacity:.4"':''}>
       </td>
       <td style="text-align:center">
-        <input class="offset-input" data-gym="${g}" data-field="fat" type="number" step="0.05" value="${off.fat}">
+        <input class="offset-input" data-gym="${g}" data-field="fat" type="number" step="0.05" value="${off.fat}" ${isBaijeck?'disabled style="opacity:.4"':''}>
       </td>
     </tr>`;
   }).join('');
-  tbody.querySelectorAll('.offset-input').forEach(inp => {
+  tbody.querySelectorAll('.offset-input:not([disabled])').forEach(inp => {
     inp.addEventListener('change', () => {
       const gym=inp.dataset.gym, field=inp.dataset.field;
       if(!offsets[gym]) offsets[gym]={muscle:0,fat:0};
@@ -686,7 +685,7 @@ function renderOffsetTable() {
 
 // ── Monthly Trend ──────────────────────────────────────
 function getMonthLabel(ym) {
-  const [y,m]=ym.split('.'); return `${y}년 ${parseInt(m)}월`;
+  const [y,m]=ym.split('.'); return `'${y}.${m}`;
 }
 
 function rateMonth(dm, df) {
@@ -765,19 +764,19 @@ function renderMonthlyTrend() {
     const mChg=dm!=null?` (${sign(dm,false)})`:'';
     const fChg=df!=null?` (${sign(df,true)})`:'';
     return `<tr>
-      <td style="color:var(--text)">${getMonthLabel(cur.month)}<span style="font-size:10px;color:var(--text3);margin-left:4px">(${cur.n}회)</span></td>
-      <td>${mStr}${mChg} kg</td>
-      <td>${fStr}${fChg} kg</td>
+      <td style="color:var(--text)">${getMonthLabel(cur.month)}<span style="font-size:10px;color:var(--text3);margin-left:4px">(${cur.n})</span></td>
+      <td>${mStr}${mChg}</td>
+      <td>${fStr}${fChg}</td>
       <td><span style="color:${rate.color};font-family:'Noto Sans KR',sans-serif;font-size:12px">${rate.label}</span></td>
     </tr>`;
   }).join('');
 
   document.getElementById('monthlyTrendTable').innerHTML=`
     <table class="trend-table" style="margin-top:.5rem">
-      <thead><tr><th style="text-align:left">월</th><th>골격근량</th><th>체지방량</th><th>판정</th></tr></thead>
+      <thead><tr><th style="text-align:left">월</th><th>골격근</th><th>체지방</th><th>판정</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <p style="font-size:10px;color:var(--text3);margin-top:.4rem">보정 적용값 · 전월 대비 증감 표기</p>`;
+    <p style="font-size:10px;color:var(--text3);margin-top:.4rem">단위 kg · 보정 적용 · 전월 대비 증감</p>`;
 }
 
 // ── Goal Card ──────────────────────────────────────────
@@ -1030,7 +1029,83 @@ function renderAll() {
   renderMonthlyTrend();
 }
 
-// ── Stats ──────────────────────────────────────────────
+// ── Charts (새 차트 탭) ────────────────────────────────
+let muscleChartInst = null;
+let fatChartInst = null;
+
+function renderCharts() {
+  const corrected = records
+    .filter(r=>r.device==='InBody')
+    .map(applyOffset)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+
+  // 드롭박스 채우기 (분석탭과 동기화)
+  const allMonths = [...new Set(corrected.map(r=>r.date.slice(0,5)))].sort();
+  const startSel=document.getElementById('chartStartMonth');
+  const endSel=document.getElementById('chartEndMonth');
+  if(startSel.options.length===0){
+    allMonths.forEach(m=>{
+      startSel.add(new Option(`'${m.slice(0,2)}.${m.slice(3)}`,m));
+      endSel.add(new Option(`'${m.slice(0,2)}.${m.slice(3)}`,m));
+    });
+    const defaultStart=allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0];
+    startSel.value=trendStartMonth||defaultStart;
+    endSel.value=trendEndMonth||allMonths[allMonths.length-1];
+  }
+
+  const start=startSel.value;
+  const end=endSel.value;
+  let months=allMonths.filter(m=>m>=start&&m<=end);
+  if(months.length>12) months=months.slice(-12);
+
+  // 필터 적용
+  let filtered=corrected;
+  if(curGym&&curGym!=='all') filtered=filtered.filter(r=>(r.gym||'')===curGym);
+  if(curGoal&&curGoal!=='all') filtered=filtered.filter(r=>(r.goal||'')===curGoal);
+
+  // 월별 평균
+  const labels=months.map(m=>`'${m.slice(0,2)}.${m.slice(3)}`);
+  const muscleData=months.map(m=>{
+    const recs=filtered.filter(r=>r.date.slice(0,5)===m&&r.muscle!=null);
+    return recs.length?+(recs.reduce((s,r)=>s+r.muscle,0)/recs.length).toFixed(2):null;
+  });
+  const fatData=months.map(m=>{
+    const recs=filtered.filter(r=>r.date.slice(0,5)===m&&r.fat!=null);
+    return recs.length?+(recs.reduce((s,r)=>s+r.fat,0)/recs.length).toFixed(2):null;
+  });
+
+  const chartOpts=(color,min,max)=>({
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y!=null?c.parsed.y.toFixed(2)+' kg':'-'}`}}},
+    scales:{
+      x:{ticks:{color:'#555',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{min,max,ticks:{color:'#555',font:{size:10},callback:v=>v+'kg'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }
+  });
+
+  if(muscleChartInst){muscleChartInst.destroy();muscleChartInst=null;}
+  if(fatChartInst){fatChartInst.destroy();fatChartInst=null;}
+
+  const muscleNonNull=muscleData.filter(v=>v!=null);
+  const fatNonNull=fatData.filter(v=>v!=null);
+  const mMin=muscleNonNull.length?Math.floor(Math.min(...muscleNonNull))-0.5:28;
+  const mMax=muscleNonNull.length?Math.ceil(Math.max(...muscleNonNull))+0.5:38;
+  const fMin=fatNonNull.length?Math.floor(Math.min(...fatNonNull))-0.5:0;
+  const fMax=fatNonNull.length?Math.ceil(Math.max(...fatNonNull))+0.5:20;
+
+  muscleChartInst=new Chart(document.getElementById('muscleChart').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[{data:muscleData,borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,0.08)',fill:true,borderWidth:2,pointRadius:3,pointBackgroundColor:'#4ade80',tension:0.3,spanGaps:false}]},
+    options:chartOpts('#4ade80',mMin,mMax)
+  });
+  fatChartInst=new Chart(document.getElementById('fatChart').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[{data:fatData,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,0.08)',fill:true,borderWidth:2,pointRadius:3,pointBackgroundColor:'#f87171',tension:0.3,spanGaps:false}]},
+    options:chartOpts('#f87171',fMin,fMax)
+  });
+}
+
+// ── Stats (감량기/린벌크 요약용) ──────────────────────
 function renderStats() {
   const ib=getFilteredRecords().filter(r=>r.device==='InBody');
   const el=document.getElementById('statsGrid');
