@@ -186,7 +186,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <span id="offsetChevron" style="color:var(--text3);font-size:12px">▼</span>
       </div>
       <div id="offsetBody" style="display:none;margin-top:.75rem">
-        <p style="font-size:11px;color:var(--text2);margin-bottom:.6rem">기준: 휘트니스엠 마포 (0.0). 보정값 = 이 헬스장 수치 - 휘트니스엠 수치</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--text2)">기준 헬스장</span>
+          <select id="refGymSelect" style="background:var(--bg3);border:1px solid var(--amber);border-radius:6px;padding:5px 10px;color:var(--amber);font-size:12px;outline:none;flex:1">
+          </select>
+          <button class="btn btn-secondary" id="setRefGymBtn" style="font-size:11px;padding:5px 12px;white-space:nowrap">기준 변경</button>
+        </div>
+        <p style="font-size:11px;color:var(--text2);margin-bottom:.6rem">기준 헬스장 보정값 = 0.0 (나머지는 상대적 차이 입력)</p>
         <table class="offset-table">
           <thead><tr><th>헬스장</th><th style="text-align:center">근육 보정</th><th style="text-align:center">지방 보정</th></tr></thead>
           <tbody id="offsetTableBody"></tbody>
@@ -286,12 +292,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="toggle-row" id="gymToggleChart"><span class="toggle-label">헬스장</span></div>
     <div class="toggle-row" id="goalToggleChart"><span class="toggle-label">목표</span></div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem;flex-wrap:wrap">
-      <span class="toggle-label">기간</span>
-      <select id="chartStartMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-size:12px;outline:none"></select>
-      <span style="font-size:11px;color:var(--text3)">~</span>
-      <select id="chartEndMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-size:12px;outline:none"></select>
-    </div>
+    <div id="chartRangeLabel" style="font-size:11px;color:var(--text3);margin-bottom:.75rem"></div>
     <div class="chart-card" style="margin-bottom:.75rem">
       <div style="font-size:11px;color:var(--text2);font-weight:500;margin-bottom:.6rem">골격근량 (kg) — 월별 평균</div>
       <div class="chart-wrap"><canvas id="muscleChart"></canvas></div>
@@ -317,7 +318,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <!-- 기기 보정 월별 추세 (항상 표시) -->
     <div class="a-card info" style="margin-bottom:.65rem">
       <div class="a-title">📊 기기 보정 월별 추세
-        <span style="font-size:10px;color:var(--text3);margin-left:4px">기준: 휘트니스엠 마포</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:4px" id="refGymLabel">기준: 휘트니스엠 마포</span>
         <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
           <select id="trendStartMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-size:11px;outline:none"></select>
           <span style="font-size:11px;color:var(--text3)">~</span>
@@ -395,9 +396,11 @@ const GOAL_KEY   = 'body-comp-goal';
 const OFFSET_KEY = 'body-comp-offsets';
 const API_KEY_S  = 'gemini-api-key';
 const TREND_RANGE_KEY = 'body-comp-trend-range';
+const BULK_START = '26.01.01';
 const CUTOFF_IB  = '25.07.07';
 const GOAL_TYPES = ['컷팅','린벌크','더티벌크','눈바디개선'];
-const REF_GYM    = '휘트니스엠 마포';
+const REF_GYM_KEY = 'body-comp-ref-gym';
+let REF_GYM = localStorage.getItem(REF_GYM_KEY) || '휘트니스엠 마포';
 
 // ── State ──────────────────────────────────────────────
 let records  = [];
@@ -486,8 +489,7 @@ function goalLabel(g)  { return g==='눈바디개선'?'눈바디 개선':g||''; 
 function goalTagClass(g){ return g==='컷팅'?'tag-cut':g==='린벌크'?'tag-bulk':g==='더티벌크'?'tag-dirty':g==='눈바디개선'?'tag-body':''; }
 
 function applyOffset(r) {
-  // 바이젝(ACCUNIQ)은 보정 없이 그대로
-  if (r.device === 'ACCUNIQ' || r.gym === '바이젝') return { ...r };
+  if ((r.gym||'') === REF_GYM) return { ...r }; // 기준 헬스장은 보정 없음
   const off = offsets[r.gym] || { muscle: 0, fat: 0 };
   return {
     ...r,
@@ -539,6 +541,17 @@ function bindEvents() {
     setTimeout(()=>document.getElementById('goalSuggestStatus').className='status', 2000);
   });
 
+  document.getElementById('setRefGymBtn').addEventListener('click', () => {
+    const sel = document.getElementById('refGymSelect');
+    const newRef = sel.value;
+    if (!newRef || newRef === REF_GYM) return;
+    REF_GYM = newRef;
+    localStorage.setItem(REF_GYM_KEY, REF_GYM);
+    renderOffsetTable();
+    renderMonthlyTrend();
+    renderCharts();
+  });
+
   document.getElementById('offsetToggle').addEventListener('click', () => {
     const body = document.getElementById('offsetBody');
     const chev = document.getElementById('offsetChevron');
@@ -586,8 +599,8 @@ function bindEvents() {
     localStorage.setItem(TREND_RANGE_KEY, JSON.stringify({start:trendStartMonth, end:trendEndMonth}));
     renderMonthlyTrend();
   });
-  document.getElementById('chartStartMonth').addEventListener('change', ()=>renderCharts());
-  document.getElementById('chartEndMonth').addEventListener('change',   ()=>renderCharts());
+  document.getElementById('chartStartMonth')?.addEventListener('change', ()=>renderCharts());
+  document.getElementById('chartEndMonth')?.addEventListener('change',   ()=>renderCharts());
 
   document.getElementById('exportBtn').addEventListener('click', exportXlsx);
   document.getElementById('clearAllBtn').addEventListener('click', ()=>{
@@ -677,10 +690,16 @@ function removeGym(name) {
 
 // ── Offset Table ───────────────────────────────────────
 function renderOffsetTable() {
-  const tbody = document.getElementById('offsetTableBody');
-  // 기록에 있는 헬스장 + gyms 배열 합쳐서 기준 헬스장 제외
   const fromRecords = [...new Set(records.map(r=>r.gym).filter(Boolean))];
   const allGyms = [...new Set([...gyms, ...fromRecords])].filter(Boolean).sort();
+
+  // 기준 헬스장 드롭박스 채우기
+  const refSel = document.getElementById('refGymSelect');
+  if (refSel) {
+    refSel.innerHTML = allGyms.map(g=>`<option value="${g}"${g===REF_GYM?' selected':''}>${g}</option>`).join('');
+  }
+
+  const tbody = document.getElementById('offsetTableBody');
   if (!allGyms.length) {
     tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);font-size:11px;padding:6px 8px">헬스장을 추가하면 보정값 설정 가능</td></tr>';
     return;
@@ -688,14 +707,13 @@ function renderOffsetTable() {
   tbody.innerHTML = allGyms.map(g => {
     const off = offsets[g] || { muscle:0, fat:0 };
     const isRef = (g === REF_GYM);
-    const isBaijeck = (g === '바이젝');
     return `<tr>
-      <td style="padding:5px 8px;font-size:12px;color:var(--text)">${g}${isRef?'<span style="font-size:10px;color:var(--amber);margin-left:4px">기준</span>':''}${isBaijeck?'<span style="font-size:10px;color:var(--text3);margin-left:4px">(보정 미적용)</span>':''}</td>
+      <td style="padding:5px 8px;font-size:12px;color:var(--text)">${g}${isRef?'<span style="font-size:10px;color:var(--amber);margin-left:4px">기준</span>':''}</td>
       <td style="text-align:center">
-        <input class="offset-input" data-gym="${g}" data-field="muscle" type="number" step="0.05" value="${off.muscle}" ${isBaijeck?'disabled style="opacity:.4"':''}>
+        <input class="offset-input" data-gym="${g}" data-field="muscle" type="number" step="0.05" value="${isRef?'0.00':off.muscle}" ${isRef?'disabled style="opacity:.4"':''}>
       </td>
       <td style="text-align:center">
-        <input class="offset-input" data-gym="${g}" data-field="fat" type="number" step="0.05" value="${off.fat}" ${isBaijeck?'disabled style="opacity:.4"':''}>
+        <input class="offset-input" data-gym="${g}" data-field="fat" type="number" step="0.05" value="${isRef?'0.00':off.fat}" ${isRef?'disabled style="opacity:.4"':''}>
       </td>
     </tr>`;
   }).join('');
@@ -724,6 +742,10 @@ function rateMonth(dm, df) {
 }
 
 function renderMonthlyTrend() {
+  // 기준 헬스장 레이블 업데이트
+  const refLbl = document.getElementById('refGymLabel');
+  if (refLbl) refLbl.textContent = `기준: ${REF_GYM}`;
+
   // 보정 적용한 InBody 기록 전체
   const corrected = records
     .filter(r=>r.device==='InBody')
@@ -1068,22 +1090,16 @@ function renderCharts() {
     .map(applyOffset)
     .sort((a,b)=>a.date.localeCompare(b.date));
 
-  // 드롭박스 채우기 (분석탭과 동기화)
   const allMonths = [...new Set(corrected.map(r=>r.date.slice(0,5)))].sort();
-  const startSel=document.getElementById('chartStartMonth');
-  const endSel=document.getElementById('chartEndMonth');
-  if(startSel.options.length===0){
-    allMonths.forEach(m=>{
-      startSel.add(new Option(`'${m.slice(0,2)}.${m.slice(3)}`,m));
-      endSel.add(new Option(`'${m.slice(0,2)}.${m.slice(3)}`,m));
-    });
-    const defaultStart=allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0];
-    startSel.value=trendStartMonth||defaultStart;
-    endSel.value=trendEndMonth||allMonths[allMonths.length-1];
-  }
+  if(!allMonths.length) return;
 
-  const start=startSel.value;
-  const end=endSel.value;
+  // 분석탭 기간 그대로 사용
+  const start = trendStartMonth || (allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0]);
+  const end   = trendEndMonth   || allMonths[allMonths.length-1];
+
+  const label = document.getElementById('chartRangeLabel');
+  if(label) label.textContent = `기간: ${getMonthLabel(start)} ~ ${getMonthLabel(end)}${curGym!=='all'?' · '+curGym:''}`;
+
   let months=allMonths.filter(m=>m>=start&&m<=end);
   if(months.length>12) months=months.slice(-12);
 
@@ -1093,7 +1109,7 @@ function renderCharts() {
   if(curGoal&&curGoal!=='all') filtered=filtered.filter(r=>(r.goal||'')===curGoal);
 
   // 월별 평균
-  const labels=months.map(m=>`'${m.slice(0,2)}.${m.slice(3)}`);
+  const labels=months.map(m=>getMonthLabel(m));
   const muscleData=months.map(m=>{
     const recs=filtered.filter(r=>r.date.slice(0,5)===m&&r.muscle!=null);
     return recs.length?+(recs.reduce((s,r)=>s+r.muscle,0)/recs.length).toFixed(2):null;
