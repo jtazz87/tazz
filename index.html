@@ -1240,20 +1240,20 @@ async function runAnalysis() {
   }
   const rel=calcRel(last,sameGymPrev);
   const janRec=ib.find(r=>r.date>='26.01.01');
-  const slim=r=>({date:r.date,w:r.weight,m:r.muscle,f:r.fat,fp:r.fatpct});
-  showStatus('analysisStatus','loading',`분석 중${sameGym?' ('+sameGym+')':''}...`);
+  const slim=r=>({d:r.date,w:r.weight,m:r.muscle,f:r.fat,fp:r.fatpct});
+  showStatus('analysisStatus','loading',`분석 중${sameGym!=='전체'?' ('+sameGym+')':''}...`);
   document.getElementById('analysisResult').innerHTML='';
   document.getElementById('analysisBtn').disabled=true;
-  const prompt=`InBody/ACCUNIQ 체성분. 38세 남성(177cm). 목표: ${activeGoalType}. 헬스장: ${sameGym}.
-데이터: ${JSON.stringify({린벌크시작:slim(bulk[0]??ib[0]),일월기준:janRec?slim(janRec):null,최신:slim(last),당월평균:cmAvg,전월평균:pmAvg,최근7개:recent7.map(slim)})}
-JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_points":["린벌크시작 대비 핵심1","핵심2"]},"recent":{"body":"최근 흐름 2문장"},"advice":{"prev_month":"전월대비 당월평균 기준 1문장","since_jan":"1월이후 1문장","cheer":"따뜻한 격려 1문장"}}`;
+  const prompt=`체성분 분석. 38세남성 177cm. 목표:${activeGoalType}. 필터:${sameGym}.
+${JSON.stringify({시작:slim(bulk[0]??ib[0]),당월:cmAvg,전월:pmAvg,최근5:recent7.slice(-5).map(slim)})}
+JSON만: {"trend":{"grade":"good|caution|warn","title":"요약","points":["핵심1","핵심2"]},"recent":{"body":"흐름2문장"},"advice":{"prev":"전월vs당월비교1문장","cheer":"격려1문장"}}`;
   try {
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
     });
     const data=await res.json();
     const rawText=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
-    if(!rawText) throw new Error('응답 없음');
+    if(!rawText) throw new Error(JSON.stringify(data).slice(0,400));
     let p; try{ p=JSON.parse(rawText.replace(/```json|```/g,'').trim()); } catch(e){ throw new Error('JSON 파싱 실패: '+rawText.slice(0,150)); }
     const rc=rel.score>=80?'#4ade80':rel.score>=60?'#fbbf24':'#f87171';
     const rb=rel.score>=80?'rgba(74,222,128,0.08)':rel.score>=60?'rgba(251,191,36,0.08)':'rgba(248,113,113,0.08)';
