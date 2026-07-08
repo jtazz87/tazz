@@ -394,7 +394,7 @@ const GYM_KEY    = 'body-comp-gyms';
 const GOAL_KEY   = 'body-comp-goal';
 const OFFSET_KEY = 'body-comp-offsets';
 const API_KEY_S  = 'gemini-api-key';
-const BULK_START = '26.01.01';
+const TREND_RANGE_KEY = 'body-comp-trend-range';
 const CUTOFF_IB  = '25.07.07';
 const GOAL_TYPES = ['컷팅','린벌크','더티벌크','눈바디개선'];
 const REF_GYM    = '휘트니스엠 마포';
@@ -440,14 +440,29 @@ let trendEndMonth   = '';
     if (r.device === 'ACCUNIQ' && !r.gym) { r.gym = '바이젝'; migrated = true; }
     if (fmDates.has(r.date) && r.device === 'InBody' && !r.gym) { r.gym = '휘트니스엠 마포'; migrated = true; }
     if (r.device === 'InBody' && r.date >= '26.05.01' && r.date <= '26.06.05' && !r.gym) { r.gym = '더블에스휘트니스'; migrated = true; }
+    // Migration: 25.11~26.04 InBody 헬스장 미설정 → 휘트니스엠 선릉
+  records.forEach(r => {
+    if (r.device==='InBody' && !r.gym && r.date>='25.11.01' && r.date<='26.04.30') {
+      r.gym='휘트니스엠 선릉'; migrated=true;
+    }
+  });
+
+  records.forEach(r => {
     if (!r.goal) { r.goal = r.date < BULK_START ? '컷팅' : '린벌크'; migrated = true; }
+  });
   });
   if (migrated) saveRec();
 
-  ['바이젝','휘트니스엠 마포','더블에스휘트니스'].forEach(g => { if (!gyms.includes(g)) gyms.push(g); });
+  ['바이젝','휘트니스엠 마포','휘트니스엠 선릉','더블에스휘트니스'].forEach(g => { if (!gyms.includes(g)) gyms.push(g); });
   records.forEach(r => { if (r.gym && !gyms.includes(r.gym)) gyms.push(r.gym); });
   saveGyms();
   saveOffsets();
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(TREND_RANGE_KEY) || '{}');
+    if (saved.start) trendStartMonth = saved.start;
+    if (saved.end)   trendEndMonth   = saved.end;
+  } catch(e) {}
 
   bindEvents();
   updateApiKeyBadge();
@@ -561,8 +576,16 @@ function bindEvents() {
   document.getElementById('rangeEnd').addEventListener('input',   e=>{ customEnd  =e.target.value.trim(); renderStats(); buildChart(); });
 
   document.getElementById('analysisBtn').addEventListener('click', runAnalysis);
-  document.getElementById('trendStartMonth').addEventListener('change', e=>{ trendStartMonth=e.target.value; renderMonthlyTrend(); });
-  document.getElementById('trendEndMonth').addEventListener('change',   e=>{ trendEndMonth  =e.target.value; renderMonthlyTrend(); });
+  document.getElementById('trendStartMonth').addEventListener('change', e=>{
+    trendStartMonth=e.target.value;
+    localStorage.setItem(TREND_RANGE_KEY, JSON.stringify({start:trendStartMonth, end:trendEndMonth}));
+    renderMonthlyTrend();
+  });
+  document.getElementById('trendEndMonth').addEventListener('change', e=>{
+    trendEndMonth=e.target.value;
+    localStorage.setItem(TREND_RANGE_KEY, JSON.stringify({start:trendStartMonth, end:trendEndMonth}));
+    renderMonthlyTrend();
+  });
   document.getElementById('chartStartMonth').addEventListener('change', ()=>renderCharts());
   document.getElementById('chartEndMonth').addEventListener('change',   ()=>renderCharts());
 
@@ -583,6 +606,9 @@ function switchTab(id, btn) {
   document.getElementById('panel-'+id).classList.add('active');
   btn.classList.add('active');
   renderGymGoalToggles();
+  // 분석 버튼은 탭 전환할 때마다 재바인딩 (innerHTML 재생성으로 이벤트 끊김 방지)
+  const ab = document.getElementById('analysisBtn');
+  if(ab){ ab.onclick = runAnalysis; }
   if (id==='chart')    { renderCharts(); }
   if (id==='history')  { renderHistory(); }
   if (id==='analysis') { renderMonthlyTrend(); }
@@ -715,19 +741,22 @@ function renderMonthlyTrend() {
   // 드롭박스 채우기
   const startSel=document.getElementById('trendStartMonth');
   const endSel=document.getElementById('trendEndMonth');
-  const prevStart=trendStartMonth||startSel.value;
-  const prevEnd=trendEndMonth||endSel.value;
-  startSel.innerHTML=allMonths.map(m=>`<option value="${m}">${getMonthLabel(m)}</option>`).join('');
-  endSel.innerHTML=allMonths.map(m=>`<option value="${m}">${getMonthLabel(m)}</option>`).join('');
 
-  // 기본: 최근 12개월
+  // 옵션이 없을 때만 채우기 (재생성 시 선택값 리셋 방지)
+  if(startSel.options.length === 0){
+    allMonths.forEach(m=>{
+      startSel.add(new Option(getMonthLabel(m), m));
+      endSel.add(new Option(getMonthLabel(m), m));
+    });
+  }
+
   if(!trendStartMonth){
     const defaultStart=allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0];
-    startSel.value=defaultStart; trendStartMonth=defaultStart;
-  } else { startSel.value=trendStartMonth; }
-  if(!trendEndMonth){
-    endSel.value=allMonths[allMonths.length-1]; trendEndMonth=allMonths[allMonths.length-1];
-  } else { endSel.value=trendEndMonth; }
+    trendStartMonth=defaultStart;
+  }
+  if(!trendEndMonth){ trendEndMonth=allMonths[allMonths.length-1]; }
+  startSel.value=trendStartMonth;
+  endSel.value=trendEndMonth;
 
   // 선택 범위 내 월만, 최대 12개
   let months=allMonths.filter(m=>m>=trendStartMonth&&m<=trendEndMonth);
