@@ -721,10 +721,12 @@ function renderMonthlyTrend() {
   const refLbl = document.getElementById('refGymLabel');
   if (refLbl) refLbl.textContent = `기준: ${REF_GYM}`;
 
-  // 보정 적용한 전체 기록 (InBody + ACCUNIQ)
-  const corrected = records
+  // 보정 적용 + 헬스장/목표 필터
+  let corrected = records
     .map(applyOffset)
     .sort((a,b)=>a.date.localeCompare(b.date));
+  if (curGym && curGym !== 'all') corrected = corrected.filter(r=>(r.gym||'')===curGym);
+  if (curGoal && curGoal !== 'all') corrected = corrected.filter(r=>(r.goal||'')===curGoal);
 
   if (!corrected.length) {
     document.getElementById('monthlyTrendTable').innerHTML='<p style="font-size:12px;color:var(--text3);padding:.5rem 0">InBody 기록이 없습니다.</p>';
@@ -1050,9 +1052,12 @@ let muscleChartInst = null;
 let fatChartInst = null;
 
 function renderCharts() {
-  const corrected = records
+  let corrected = records
     .map(applyOffset)
     .sort((a,b)=>a.date.localeCompare(b.date));
+  // 헬스장/목표 필터 (전체면 전체)
+  if(curGym && curGym!=='all') corrected=corrected.filter(r=>(r.gym||'')===curGym);
+  if(curGoal && curGoal!=='all') corrected=corrected.filter(r=>(r.goal||'')===curGoal);
 
   const allMonths = [...new Set(corrected.map(r=>r.date.slice(0,5)))].sort();
   if(!allMonths.length) return;
@@ -1067,19 +1072,15 @@ function renderCharts() {
   let months=allMonths.filter(m=>m>=start&&m<=end);
   if(months.length>12) months=months.slice(-12);
 
-  // 필터 적용
-  let filtered=corrected;
-  if(curGym&&curGym!=='all') filtered=filtered.filter(r=>(r.gym||'')===curGym);
-  if(curGoal&&curGoal!=='all') filtered=filtered.filter(r=>(r.goal||'')===curGoal);
 
   // 월별 평균
   const labels=months.map(m=>getMonthLabel(m));
   const muscleData=months.map(m=>{
-    const recs=filtered.filter(r=>r.date.slice(0,5)===m&&r.muscle!=null);
+    const recs=corrected.filter(r=>r.date.slice(0,5)===m&&r.muscle!=null);
     return recs.length?+(recs.reduce((s,r)=>s+r.muscle,0)/recs.length).toFixed(2):null;
   });
   const fatData=months.map(m=>{
-    const recs=filtered.filter(r=>r.date.slice(0,5)===m&&r.fat!=null);
+    const recs=corrected.filter(r=>r.date.slice(0,5)===m&&r.fat!=null);
     return recs.length?+(recs.reduce((s,r)=>s+r.fat,0)/recs.length).toFixed(2):null;
   });
 
