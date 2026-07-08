@@ -407,12 +407,8 @@ let records  = [];
 let gyms     = [];
 let goalCfg  = { type:'', weight:null, muscle:null, fat:null, fatpct:null };
 let offsets  = {};
-let curMetric = 'weight';
-let curRange  = 'all';
 let curGym    = 'all';
 let curGoal   = 'all';
-let customStart = '', customEnd = '';
-let chart = null;
 let editIdx = -1;
 let selectedImages = [];
 let trendStartMonth = '';
@@ -507,12 +503,6 @@ function getFilteredRecords() {
   let arr = [...records].sort((a,b)=>a.date.localeCompare(b.date));
   if (curGym  && curGym  !== 'all') arr = arr.filter(r=>(r.gym||'')===curGym);
   if (curGoal && curGoal !== 'all') arr = arr.filter(r=>(r.goal||'')===curGoal);
-  if (curRange==='all')  return arr;
-  if (curRange==='cut')  return arr.filter(r=>getPhase(r.date)==='cut');
-  if (curRange==='bulk') return arr.filter(r=>getPhase(r.date)==='bulk');
-  if (curRange==='3m')   { const d=new Date();d.setMonth(d.getMonth()-3);return arr.filter(r=>r.date>=fmtDate(d)); }
-  if (curRange==='1m')   { const d=new Date();d.setMonth(d.getMonth()-1);return arr.filter(r=>r.date>=fmtDate(d)); }
-  if (curRange==='custom') return arr.filter(r=>(!customStart||r.date>=customStart)&&(!customEnd||r.date<=customEnd));
   return arr;
 }
 
@@ -571,22 +561,7 @@ function bindEvents() {
   document.getElementById('saveRecordBtn').addEventListener('click', saveRecord);
   document.getElementById('cancelExtractBtn').addEventListener('click', resetUpload);
 
-  document.querySelectorAll('.t-btn[data-metric]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.t-btn[data-metric]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active'); curMetric=btn.dataset.metric; buildChart();
-    })
-  );
-  document.querySelectorAll('.t-btn[data-range]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.t-btn[data-range]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active'); curRange=btn.dataset.range;
-      document.getElementById('customRangeWrap').style.display = curRange==='custom'?'block':'none';
-      renderStats(); buildChart();
-    })
-  );
-  document.getElementById('rangeStart').addEventListener('input', e=>{ customStart=e.target.value.trim(); renderStats(); buildChart(); });
-  document.getElementById('rangeEnd').addEventListener('input',   e=>{ customEnd  =e.target.value.trim(); renderStats(); buildChart(); });
+  // (구 차트탭 이벤트 제거됨)
 
   document.getElementById('analysisBtn').addEventListener('click', runAnalysis);
   document.getElementById('trendStartMonth').addEventListener('change', e=>{
@@ -685,7 +660,7 @@ function removeGym(name) {
   gyms=gyms.filter(g=>g!==name);
   if(curGym===name) curGym='all';
   saveGyms(); renderGymGoalToggles();
-  renderStats(); buildChart(); renderHistory(); renderMonthlyTrend();
+  renderHistory(); renderMonthlyTrend();
 }
 
 // ── Offset Table ───────────────────────────────────────
@@ -746,9 +721,8 @@ function renderMonthlyTrend() {
   const refLbl = document.getElementById('refGymLabel');
   if (refLbl) refLbl.textContent = `기준: ${REF_GYM}`;
 
-  // 보정 적용한 InBody 기록 전체
+  // 보정 적용한 전체 기록 (InBody + ACCUNIQ)
   const corrected = records
-    .filter(r=>r.device==='InBody')
     .map(applyOffset)
     .sort((a,b)=>a.date.localeCompare(b.date));
 
@@ -760,25 +734,18 @@ function renderMonthlyTrend() {
   // 월 목록
   const allMonths = [...new Set(corrected.map(r=>r.date.slice(0,5)))].sort();
 
-  // 드롭박스 채우기
+  // 드롭박스 채우기 (항상 재생성, 값 보존)
   const startSel=document.getElementById('trendStartMonth');
   const endSel=document.getElementById('trendEndMonth');
 
-  // 옵션이 없을 때만 채우기 (재생성 시 선택값 리셋 방지)
-  if(startSel.options.length === 0){
-    allMonths.forEach(m=>{
-      startSel.add(new Option(getMonthLabel(m), m));
-      endSel.add(new Option(getMonthLabel(m), m));
-    });
-  }
+  const savedStart = trendStartMonth || (allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0]);
+  const savedEnd   = trendEndMonth   || allMonths[allMonths.length-1];
 
-  if(!trendStartMonth){
-    const defaultStart=allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0];
-    trendStartMonth=defaultStart;
-  }
-  if(!trendEndMonth){ trendEndMonth=allMonths[allMonths.length-1]; }
-  startSel.value=trendStartMonth;
-  endSel.value=trendEndMonth;
+  startSel.innerHTML = allMonths.map(m=>`<option value="${m}"${m===savedStart?' selected':''}>${getMonthLabel(m)}</option>`).join('');
+  endSel.innerHTML   = allMonths.map(m=>`<option value="${m}"${m===savedEnd?' selected':''}>${getMonthLabel(m)}</option>`).join('');
+
+  trendStartMonth = savedStart;
+  trendEndMonth   = savedEnd;
 
   // 선택 범위 내 월만, 최대 12개
   let months=allMonths.filter(m=>m>=trendStartMonth&&m<=trendEndMonth);
@@ -1075,8 +1042,6 @@ function renderAll() {
   renderGymGoalToggles();
   renderGoalProgress();
   renderHistory();
-  renderStats();
-  buildChart();
   renderMonthlyTrend();
 }
 
@@ -1086,7 +1051,6 @@ let fatChartInst = null;
 
 function renderCharts() {
   const corrected = records
-    .filter(r=>r.device==='InBody')
     .map(applyOffset)
     .sort((a,b)=>a.date.localeCompare(b.date));
 
@@ -1151,62 +1115,9 @@ function renderCharts() {
 }
 
 // ── Stats (감량기/린벌크 요약용) ──────────────────────
-function renderStats() {
-  const ib=getFilteredRecords().filter(r=>r.device==='InBody');
-  const el=document.getElementById('statsGrid');
-  if(!ib.length){ el.innerHTML=''; return; }
-  const first=ib[0],last=ib[ib.length-1];
-  const diff=(a,b)=>a!=null&&b!=null?(b-a).toFixed(1):null;
-  const sign=v=>v>0?'+':'';
-  const cls=(v,pg)=>pg?(v>0?'pos':v<0?'neg':'neu'):(v<0?'pos':v>0?'neg':'neu');
-  const dw=diff(first.weight,last.weight),dm=diff(first.muscle,last.muscle);
-  const df=diff(first.fat,last.fat),dp=diff(first.fatpct,last.fatpct);
-  el.innerHTML=[
-    {val:last.weight,unit:'kg',lbl:'체중',chg:dw,pg:false},
-    {val:last.muscle,unit:'kg',lbl:'골격근량',chg:dm,pg:true},
-    {val:last.fat,unit:'kg',lbl:'체지방량',chg:df,pg:false},
-    {val:last.fatpct,unit:'%',lbl:'체지방률',chg:dp,pg:false},
-  ].map(s=>{
-    const c=s.chg!=null?cls(+s.chg,s.pg):'neu';
-    return `<div class="stat-card"><div class="val">${s.val??'-'}<span style="font-size:12px;font-weight:400">${s.unit}</span></div><div class="lbl">${s.lbl}</div><div class="chg ${c}">${s.chg!=null?sign(+s.chg)+s.chg+s.unit:'—'}</div></div>`;
-  }).join('');
-}
+function renderStats() {}
 
 // ── Chart ──────────────────────────────────────────────
-const METRIC_CFG={
-  weight:{label:'체중',unit:'kg',key:'weight',min:55,max:92},
-  muscle:{label:'골격근량',unit:'kg',key:'muscle',min:28,max:38},
-  fat:{label:'체지방량',unit:'kg',key:'fat',min:0,max:32},
-  fatpct:{label:'체지방률',unit:'%',key:'fatpct',min:5,max:36},
-  bmr:{label:'기초대사량',unit:'kcal',key:'bmr',min:1400,max:1900},
-};
-function buildChart() {
-  const cfg=METRIC_CFG[curMetric];
-  document.getElementById('chartTitle').textContent=`${cfg.label} 추이${curGym!=='all'?' — '+curGym:''}${curGoal!=='all'?' ['+goalLabel(curGoal)+']':''}`;
-  const ib=getFilteredRecords().filter(r=>r.device==='InBody');
-  if(chart){chart.destroy();chart=null;}
-  if(!ib.length) return;
-  const ctx=document.getElementById('mainChart').getContext('2d');
-  chart=new Chart(ctx,{
-    type:'line',
-    data:{
-      labels:ib.map(r=>r.date),
-      datasets:[
-        {label:'감량기',data:ib.map(r=>getPhase(r.date)==='cut'?(r[cfg.key]??null):null),borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,0.06)',fill:true,borderWidth:2,pointRadius:2.5,tension:0.3,spanGaps:false},
-        {label:'린벌크',data:ib.map(r=>getPhase(r.date)==='bulk'?(r[cfg.key]??null):null),borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,0.06)',fill:true,borderWidth:2,pointRadius:2.5,tension:0.3,spanGaps:false},
-      ]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(1)+cfg.unit:'-'}`}}},
-      scales:{
-        x:{ticks:{color:'#555',font:{size:9},maxTicksLimit:12,maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},
-        y:{min:cfg.min,max:cfg.max,ticks:{color:'#555',font:{size:10},callback:v=>v+cfg.unit},grid:{color:'rgba(255,255,255,0.05)'}}
-      }
-    }
-  });
-}
-
 // ── History ────────────────────────────────────────────
 function renderHistory() {
   let list=[...records].sort((a,b)=>b.date.localeCompare(a.date));
@@ -1273,12 +1184,16 @@ async function runAnalysis() {
   if(ib.length<3){ showStatus('analysisStatus','error','기록이 3개 이상 필요합니다.'); return; }
   const key=getApiKey(); if(!key){ showStatus('analysisStatus','error','Gemini API 키가 필요합니다.'); return; }
   const last=ib[ib.length-1];
-  const sameGym=last.gym||'';
-  const sameGymRecs=ib.filter(r=>(r.gym||'')===sameGym).sort((a,b)=>a.date.localeCompare(b.date));
-  const sameGymPrev=sameGymRecs.length>=2?sameGymRecs[sameGymRecs.length-2]:null;
-  const recent7=sameGymRecs.slice(-7);
   const bulk=ib.filter(r=>r.date>=BULK_START);
   const activeGoalType=curGoal!=='all'?curGoal:(goalCfg.type||'린벌크');
+
+  // 헬스장 필터: 전체면 전체, 특정 선택 시 그 헬스장만
+  const sameGym = curGym !== 'all' ? curGym : '전체';
+  const sameGymRecs = curGym !== 'all'
+    ? ib.filter(r=>(r.gym||'')===curGym).sort((a,b)=>a.date.localeCompare(b.date))
+    : ib;
+  const sameGymPrev = sameGymRecs.length>=2 ? sameGymRecs[sameGymRecs.length-2] : null;
+  const recent7 = sameGymRecs.slice(-7);
   function sameGymPrevMonthAvg(){
     const [yr,mo]=last.date.split('.').map(Number);
     let pmo=mo-1,pyr=yr; if(pmo<1){pmo=12;pyr--;}
@@ -1292,7 +1207,21 @@ async function runAnalysis() {
       fat:+avg(arr.map(r=>r.fat)).toFixed(1),
       fatpct:+avg(arr.map(r=>r.fatpct)).toFixed(1),n:arr.length};
   }
+
+  function curMonthAvg(){
+    const prefix=last.date.slice(0,5)+'.';
+    const arr=sameGymRecs.filter(r=>r.date.startsWith(prefix));
+    if(!arr.length) return null;
+    const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+    return{month:`20${last.date.slice(0,2)}년 ${parseInt(last.date.slice(3,5))}월`,
+      weight:+avg(arr.map(r=>r.weight)).toFixed(1),
+      muscle:arr.some(r=>r.muscle)?+avg(arr.filter(r=>r.muscle).map(r=>r.muscle)).toFixed(1):null,
+      fat:+avg(arr.map(r=>r.fat)).toFixed(1),
+      fatpct:+avg(arr.map(r=>r.fatpct)).toFixed(1),n:arr.length};
+  }
+
   const pmAvg=sameGymPrevMonthAvg();
+  const cmAvg=curMonthAvg();
   function calcRel(last,prev){
     if(!prev) return{score:100,reasons:['동일 헬스장 첫 기록']};
     let score=100; const reasons=[];
@@ -1315,9 +1244,9 @@ async function runAnalysis() {
   showStatus('analysisStatus','loading',`분석 중${sameGym?' ('+sameGym+')':''}...`);
   document.getElementById('analysisResult').innerHTML='';
   document.getElementById('analysisBtn').disabled=true;
-  const prompt=`InBody/ACCUNIQ 체성분. 38세 남성(177cm). 목표: ${activeGoalType}. 헬스장: ${sameGym||'미설정'}.
-데이터: ${JSON.stringify({린벌크시작:slim(bulk[0]??ib[0]),일월기준:janRec?slim(janRec):null,최신:slim(last),동일헬스장직전:sameGymPrev?slim(sameGymPrev):null,동일헬스장전월평균:pmAvg,동일헬스장최근7개:recent7.map(slim)})}
-JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_points":["린벌크시작 대비 핵심1","핵심2"]},"recent":{"body":"최근 흐름 2문장"},"advice":{"prev_month":"전월대비 1문장","since_jan":"1월이후 1문장","cheer":"따뜻한 격려 1문장"}}`;
+  const prompt=`InBody/ACCUNIQ 체성분. 38세 남성(177cm). 목표: ${activeGoalType}. 헬스장: ${sameGym}.
+데이터: ${JSON.stringify({린벌크시작:slim(bulk[0]??ib[0]),일월기준:janRec?slim(janRec):null,최신:slim(last),당월평균:cmAvg,전월평균:pmAvg,최근7개:recent7.map(slim)})}
+JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_points":["린벌크시작 대비 핵심1","핵심2"]},"recent":{"body":"최근 흐름 2문장"},"advice":{"prev_month":"전월대비 당월평균 기준 1문장","since_jan":"1월이후 1문장","cheer":"따뜻한 격려 1문장"}}`;
   try {
     const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
@@ -1332,11 +1261,19 @@ JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_poin
     const rl=rel.score>=80?'신뢰도 양호':rel.score>=60?'노이즈 주의':'노이즈 가능성 높음';
     const gm={good:'good',caution:'caution',warn:'warn'};
     let pmHtml='';
-    if(pmAvg){
+    if(pmAvg && cmAvg){
+      const cur = cmAvg;
       const s=v=>+v>0?`<span style="color:#f87171">+${v}</span>`:+v<0?`<span style="color:#4ade80">${v}</span>`:`<span style="color:#888">${v}</span>`;
       const sm=v=>+v>0?`<span style="color:#4ade80">+${v}</span>`:+v<0?`<span style="color:#f87171">${v}</span>`:`<span style="color:#888">${v}</span>`;
-      const dm=last.muscle!=null&&pmAvg.muscle!=null?(last.muscle-pmAvg.muscle).toFixed(1):null;
-      pmHtml=`<table class="wk-table" style="margin-top:.65rem"><thead><tr><th></th><th>${pmAvg.month} 평균(${pmAvg.n}회)</th><th>현재</th><th>변화</th></tr></thead><tbody><tr><td>체중</td><td>${pmAvg.weight}kg</td><td>${last.weight}kg</td><td>${s((last.weight-pmAvg.weight).toFixed(1))}kg</td></tr>${dm!=null?`<tr><td>골격근</td><td>${pmAvg.muscle}kg</td><td>${last.muscle}kg</td><td>${sm(dm)}kg</td></tr>`:''}<tr><td>체지방</td><td>${pmAvg.fat}kg</td><td>${last.fat}kg</td><td>${s((last.fat-pmAvg.fat).toFixed(1))}kg</td></tr><tr><td>지방률</td><td>${pmAvg.fatpct}%</td><td>${last.fatpct}%</td><td>${s((last.fatpct-pmAvg.fatpct).toFixed(1))}%p</td></tr></tbody></table>`;
+      const dm=cur.muscle!=null&&pmAvg.muscle!=null?(cur.muscle-pmAvg.muscle).toFixed(1):null;
+      pmHtml=`<table class="wk-table" style="margin-top:.65rem">
+        <thead><tr><th></th><th>${pmAvg.month} 평균(${pmAvg.n}회)</th><th>${cur.month} 평균(${cur.n}회)</th><th>변화</th></tr></thead>
+        <tbody>
+          <tr><td>체중</td><td>${pmAvg.weight}kg</td><td>${cur.weight}kg</td><td>${s((cur.weight-pmAvg.weight).toFixed(1))}kg</td></tr>
+          ${dm!=null?`<tr><td>골격근</td><td>${pmAvg.muscle}kg</td><td>${cur.muscle}kg</td><td>${sm(dm)}kg</td></tr>`:''}
+          <tr><td>체지방</td><td>${pmAvg.fat}kg</td><td>${cur.fat}kg</td><td>${s((cur.fat-pmAvg.fat).toFixed(1))}kg</td></tr>
+          <tr><td>지방률</td><td>${pmAvg.fatpct}%</td><td>${cur.fatpct}%</td><td>${s((cur.fatpct-pmAvg.fatpct).toFixed(1))}%p</td></tr>
+        </tbody></table>`;
     }
     const wkRows=recent7.map(r=>`<tr><td>${r.date}</td><td>${r.weight}</td><td>${r.muscle??'-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td></tr>`).join('');
     const badges=[sameGym?`<span class="a-badge info">${sameGym}</span>`:null,curGoal!=='all'?`<span class="a-badge info">${goalLabel(curGoal)}</span>`:null].filter(Boolean);
