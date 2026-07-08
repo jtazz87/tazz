@@ -73,7 +73,6 @@ h1{font-size:20px;font-weight:500;letter-spacing:-.02em;margin-bottom:3px}
 .t-btn.active{border-color:var(--green);color:var(--green);background:var(--green-dim)}
 .g-btn{font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s}
 .g-btn.active{border-color:var(--amber);color:var(--amber);background:var(--amber-dim)}
-.goal-type-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem}
 .gt-btn{font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s}
 .gt-btn.active{border-color:var(--purple);color:var(--purple);background:var(--purple-dim)}
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -88,8 +87,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .tag-body{background:var(--purple-dim);color:var(--purple)}
 .tag-ib{background:rgba(251,191,36,0.12);color:var(--amber)}
 .tag-ac{background:var(--bg3);color:var(--text3)}
-.tag-phase-cut{background:var(--blue-dim);color:var(--blue)}
-.tag-phase-bulk{background:var(--green-dim);color:var(--green)}
 .empty{text-align:center;padding:2.5rem;color:var(--text2);font-size:13px}
 .icon-btn{background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:4px;transition:all .15s;color:var(--text3);font-size:12px}
 .icon-btn:hover{background:var(--red-dim);color:var(--red)}
@@ -109,14 +106,19 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .wk-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:.5rem}
 .wk-table th{color:var(--text2);font-weight:400;padding:4px 6px;text-align:right;border-bottom:1px solid var(--border)}
 .wk-table th:first-child{text-align:left}
-.wk-table td{padding:4px 6px;text-align:right;border-bottom:.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px}
+.wk-table td{padding:5px 6px;text-align:right;border-bottom:.5px solid var(--border);font-family:'DM Mono',monospace;font-size:12px}
 .wk-table td:first-child{text-align:left;color:var(--text2);font-family:inherit}
+.trend-table{width:100%;border-collapse:collapse;font-size:12px}
+.trend-table th{padding:6px 8px;text-align:center;color:var(--text2);font-weight:400;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.trend-table th:first-child{text-align:left}
+.trend-table td{padding:7px 8px;text-align:center;border-bottom:.5px solid var(--border);font-family:'DM Mono',monospace;font-size:12px}
+.trend-table td:first-child{text-align:left;font-family:'Noto Sans KR',sans-serif;color:var(--text2);font-size:12px}
 .goal-progress{display:flex;flex-direction:column;gap:6px;margin-top:.5rem}
 .goal-row{display:flex;align-items:center;gap:8px;font-size:12px}
-.goal-row .gr-label{color:var(--text2);width:60px;flex-shrink:0}
-.goal-bar-wrap{flex:1;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden}
+.goal-row .gr-label{color:var(--text2);width:55px;flex-shrink:0;font-size:11px}
+.goal-bar-wrap{flex:1;background:var(--bg3);border-radius:4px;height:5px;overflow:hidden}
 .goal-bar{height:100%;border-radius:4px;transition:width .3s}
-.goal-row .gr-val{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);width:80px;text-align:right;flex-shrink:0}
+.goal-row .gr-val{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);min-width:90px;text-align:right;flex-shrink:0}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center;padding:1rem}
 .modal-bg.open{display:flex}
 .modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:440px;max-height:90vh;overflow-y:auto}
@@ -126,6 +128,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .divider{display:flex;align-items:center;gap:10px;margin:.75rem 0}
 .divider-line{flex:1;height:1px;background:var(--border)}
 .divider-text{font-size:11px;color:var(--text3);white-space:nowrap}
+.offset-table{width:100%;border-collapse:collapse;font-size:12px}
+.offset-table th{padding:5px 8px;color:var(--text2);font-weight:400;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left}
+.offset-table td{padding:5px 4px;border-bottom:.5px solid var(--border)}
+.offset-input{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 7px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;outline:none;width:70px;text-align:right}
+.offset-input:focus{border-color:var(--green)}
 @media(max-width:480px){.grid3{grid-template-columns:1fr 1fr}.grid4{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -147,7 +154,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <!-- 목표 설정 -->
     <div class="card">
       <div class="card-label">🎯 목표 설정</div>
-      <div class="goal-type-row" id="goalTypeRow">
+      <div id="goalTypeRow" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem">
         <button class="gt-btn" data-goal="컷팅">컷팅</button>
         <button class="gt-btn" data-goal="린벌크">린벌크</button>
         <button class="gt-btn" data-goal="더티벌크">더티벌크</button>
@@ -165,11 +172,26 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div class="field"><label>목표 체지방(kg)</label><input id="g-fat" type="number" step="0.1" placeholder="—"></div>
           <div class="field"><label>목표 지방률(%)</label><input id="g-fatpct" type="number" step="0.1" placeholder="—"></div>
         </div>
-        <!-- 진행률 -->
         <div id="goalProgress" class="goal-progress"></div>
         <div style="margin-top:.6rem;text-align:right">
           <button class="btn btn-primary" id="saveGoalBtn" style="font-size:12px;padding:6px 14px">목표 저장</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 기기 보정 설정 -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" id="offsetToggle">
+        <div class="card-label" style="margin:0">⚖️ 기기 보정 설정</div>
+        <span id="offsetChevron" style="color:var(--text3);font-size:12px">▼</span>
+      </div>
+      <div id="offsetBody" style="display:none;margin-top:.75rem">
+        <p style="font-size:11px;color:var(--text2);margin-bottom:.6rem">기준: 휘트니스엠 마포 (0.0). 보정값 = 이 헬스장 수치 - 휘트니스엠 수치</p>
+        <table class="offset-table">
+          <thead><tr><th>헬스장</th><th style="text-align:center">근육 보정</th><th style="text-align:center">지방 보정</th></tr></thead>
+          <tbody id="offsetTableBody"></tbody>
+        </table>
+        <p style="font-size:10px;color:var(--text3);margin-top:.4rem">값이 음수면 이 헬스장이 기준보다 낮게 측정됨</p>
       </div>
     </div>
 
@@ -184,7 +206,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
     </div>
 
-    <!-- Gemini API 키 -->
+    <!-- API 키 -->
     <div class="card">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
         <span class="card-label" style="margin:0">Gemini API 키</span>
@@ -220,16 +242,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <button class="btn btn-primary" id="extractBtn" style="width:100%;margin-bottom:.75rem" disabled>AI로 수치 추출</button>
     <div class="status" id="extractStatus"></div>
 
-    <!-- 추출 결과 폼 -->
     <div id="extractedCard" style="display:none">
       <div class="card">
         <div class="card-label">추출된 데이터 — 확인 후 저장</div>
         <div class="grid3">
-          <div class="field"><label>날짜</label><input id="f-date" type="text" placeholder="26.06.23"></div>
-          <div class="field"><label>기기</label>
-            <select id="f-device"><option value="InBody">InBody</option><option value="ACCUNIQ">ACCUNIQ</option></select>
-          </div>
-          <div class="field"><label>헬스장</label><input id="f-gym" type="text" placeholder="에이블짐" list="gymList" autocomplete="off"></div>
+          <div class="field"><label>날짜</label><input id="f-date" type="text" placeholder="26.06.25"></div>
+          <div class="field"><label>기기</label><select id="f-device"><option value="InBody">InBody</option><option value="ACCUNIQ">ACCUNIQ</option></select></div>
+          <div class="field"><label>헬스장</label><input id="f-gym" type="text" placeholder="에이블짐 위례" list="gymList" autocomplete="off"></div>
         </div>
         <div class="grid3">
           <div class="field"><label>체중 (kg)</label><input id="f-weight" type="number" step="0.1"></div>
@@ -282,7 +301,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div id="customRangeWrap" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:.6rem">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <div class="field" style="flex:1;min-width:120px"><label>시작일</label><input id="rangeStart" type="text" placeholder="24.10.14"></div>
-        <div class="field" style="flex:1;min-width:120px"><label>종료일</label><input id="rangeEnd" type="text" placeholder="26.06.23"></div>
+        <div class="field" style="flex:1;min-width:120px"><label>종료일</label><input id="rangeEnd" type="text" placeholder="26.06.25"></div>
       </div>
     </div>
     <div class="chart-card">
@@ -302,12 +321,26 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
       <div>
         <p style="font-size:13px;font-weight:500">AI 체성분 분석</p>
-        <p style="font-size:11px;color:var(--text2);margin-top:1px">기기·헬스장·목표별 필터링 분석</p>
+        <p style="font-size:11px;color:var(--text2);margin-top:1px">동일 헬스장 기록 기준</p>
       </div>
       <button class="btn btn-primary" id="analysisBtn">분석 실행</button>
     </div>
     <div class="toggle-row" id="gymToggleAnalysis"><span class="toggle-label">헬스장</span></div>
     <div class="toggle-row" id="goalToggleAnalysis"><span class="toggle-label">목표</span></div>
+
+    <!-- 기기 보정 월별 추세 (항상 표시) -->
+    <div class="a-card info" style="margin-bottom:.65rem">
+      <div class="a-title">📊 기기 보정 월별 추세
+        <span style="font-size:10px;color:var(--text3);margin-left:4px">기준: 휘트니스엠 마포</span>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <select id="trendStartMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-size:11px;outline:none"></select>
+          <span style="font-size:11px;color:var(--text3)">~</span>
+          <select id="trendEndMonth" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-size:11px;outline:none"></select>
+        </span>
+      </div>
+      <div id="monthlyTrendTable"></div>
+    </div>
+
     <div class="status" id="analysisStatus"></div>
     <div id="analysisResult"></div>
   </div>
@@ -325,13 +358,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="toggle-row" id="goalToggleHistory"><span class="toggle-label">목표</span></div>
     <div class="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>날짜</th><th>기기</th><th>헬스장</th><th>목표</th>
-            <th>체중</th><th>근육</th><th>지방</th><th>지방%</th><th>BMR</th>
-            <th>페이즈</th><th></th>
-          </tr>
-        </thead>
+        <thead><tr><th>날짜</th><th>기기</th><th>헬스장</th><th>목표</th><th>체중</th><th>근육</th><th>지방</th><th>지방%</th><th>BMR</th><th>페이즈</th><th></th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
@@ -376,18 +403,21 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
 <script>
 // ── Constants ──────────────────────────────────────────
-const REC_KEY   = 'body-comp-records';
-const GYM_KEY   = 'body-comp-gyms';
-const GOAL_KEY  = 'body-comp-goal';
-const API_KEY_S = 'gemini-api-key';
+const REC_KEY    = 'body-comp-records';
+const GYM_KEY    = 'body-comp-gyms';
+const GOAL_KEY   = 'body-comp-goal';
+const OFFSET_KEY = 'body-comp-offsets';
+const API_KEY_S  = 'gemini-api-key';
 const BULK_START = '26.01.01';
 const CUTOFF_IB  = '25.07.07';
 const GOAL_TYPES = ['컷팅','린벌크','더티벌크','눈바디개선'];
+const REF_GYM    = '휘트니스엠 마포';
 
 // ── State ──────────────────────────────────────────────
-let records   = [];
-let gyms      = [];
-let goalCfg   = { type: '', weight: null, muscle: null, fat: null, fatpct: null };
+let records  = [];
+let gyms     = [];
+let goalCfg  = { type:'', weight:null, muscle:null, fat:null, fatpct:null };
+let offsets  = {};
 let curMetric = 'weight';
 let curRange  = 'all';
 let curGym    = 'all';
@@ -396,64 +426,80 @@ let customStart = '', customEnd = '';
 let chart = null;
 let editIdx = -1;
 let selectedImages = [];
+let trendStartMonth = '';
+let trendEndMonth   = '';
 
 // ── Init ───────────────────────────────────────────────
 (function init() {
-  try { records  = JSON.parse(localStorage.getItem(REC_KEY)  || '[]'); } catch(e) { records  = []; }
-  try { gyms     = JSON.parse(localStorage.getItem(GYM_KEY)  || '[]'); } catch(e) { gyms     = []; }
-  try { goalCfg  = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'); } catch(e) { goalCfg  = {}; }
+  try { records = JSON.parse(localStorage.getItem(REC_KEY) || '[]'); } catch(e) { records = []; }
+  try { gyms    = JSON.parse(localStorage.getItem(GYM_KEY) || '[]'); } catch(e) { gyms = []; }
+  try { goalCfg = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'); } catch(e) { goalCfg = {}; }
+  try { offsets = JSON.parse(localStorage.getItem(OFFSET_KEY) || '{}'); } catch(e) { offsets = {}; }
   goalCfg = Object.assign({ type:'', weight:null, muscle:null, fat:null, fatpct:null }, goalCfg);
 
-  // Migration: ACCUNIQ → 바이젝
-  let migrated = false;
-  records.forEach(r => { if (r.device==='ACCUNIQ' && !r.gym) { r.gym='바이젝'; migrated=true; } });
-
-  // Migration: 26.06.09,11,12,15,17,19,22,23 → 휘트니스엠 마포
-  const fitnessMDates = new Set(['26.06.09','26.06.11','26.06.12','26.06.15','26.06.17','26.06.19','26.06.22','26.06.23']);
-  records.forEach(r => { if (fitnessMDates.has(r.date) && r.device==='InBody') { r.gym='휘트니스엠 마포'; migrated=true; } });
-
-  // Migration: 26.05.01~26.06.05 InBody → 더블에스휘트니스
-  records.forEach(r => { if (r.device==='InBody' && r.date>='26.05.01' && r.date<='26.06.05') { r.gym='더블에스휘트니스'; migrated=true; } });
-
-  // Migration: goal 자동 태깅 (미설정 기록만)
-  records.forEach(r => {
-    if (!r.goal) {
-      r.goal = r.date < '26.01.01' ? '컷팅' : '린벌크';
-      migrated = true;
-    }
+  // 기본 오프셋 설정
+  const defaultOffsets = {
+    '에이블짐 위례':    { muscle: -0.20, fat: 0.0 },
+    '더블에스휘트니스': { muscle: -0.35, fat: 0.0 },
+    '바이젝':           { muscle:  0.0,  fat: 0.0 },
+  };
+  Object.entries(defaultOffsets).forEach(([gym, val]) => {
+    if (!offsets[gym]) offsets[gym] = val;
   });
 
+  // Migration
+  let migrated = false;
+  const fmDates = new Set(['26.06.09','26.06.11','26.06.12','26.06.15','26.06.17','26.06.19','26.06.22','26.06.23']);
+  records.forEach(r => {
+    if (r.device === 'ACCUNIQ' && !r.gym) { r.gym = '바이젝'; migrated = true; }
+    if (fmDates.has(r.date) && r.device === 'InBody' && !r.gym) { r.gym = '휘트니스엠 마포'; migrated = true; }
+    if (r.device === 'InBody' && r.date >= '26.05.01' && r.date <= '26.06.05' && !r.gym) { r.gym = '더블에스휘트니스'; migrated = true; }
+    if (!r.goal) { r.goal = r.date < BULK_START ? '컷팅' : '린벌크'; migrated = true; }
+  });
   if (migrated) saveRec();
 
-  // Auto-register default gyms
   ['바이젝','휘트니스엠 마포','더블에스휘트니스'].forEach(g => { if (!gyms.includes(g)) gyms.push(g); });
-
-  // Auto-register any gym found in records but not in gyms list
   records.forEach(r => { if (r.gym && !gyms.includes(r.gym)) gyms.push(r.gym); });
-
   saveGyms();
+  saveOffsets();
 
   bindEvents();
   updateApiKeyBadge();
   renderGoalCard();
+  renderOffsetTable();
   renderAll();
 })();
 
-function saveRec()  { localStorage.setItem(REC_KEY,  JSON.stringify(records)); }
-function saveGyms() { localStorage.setItem(GYM_KEY,  JSON.stringify(gyms)); }
-function saveGoal() { localStorage.setItem(GOAL_KEY, JSON.stringify(goalCfg)); }
+function saveRec()     { localStorage.setItem(REC_KEY,    JSON.stringify(records)); }
+function saveGyms()    { localStorage.setItem(GYM_KEY,    JSON.stringify(gyms)); }
+function saveGoal()    { localStorage.setItem(GOAL_KEY,   JSON.stringify(goalCfg)); }
+function saveOffsets() { localStorage.setItem(OFFSET_KEY, JSON.stringify(offsets)); }
 
 // ── Helpers ────────────────────────────────────────────
-function getPhase(d) { return parseInt((d||'0').split('.')[0]) >= 26 ? 'bulk' : 'cut'; }
-function todayStr() { const d=new Date(); return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
-function fmtDate(d) { return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+function getPhase(d)   { return parseInt((d||'0').split('.')[0]) >= 26 ? 'bulk' : 'cut'; }
+function todayStr()    { const d=new Date(); return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+function fmtDate(d)    { return `${String(d.getFullYear()).slice(-2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
 function showStatus(id, type, msg) { const el=document.getElementById(id); el.className='status '+type; el.textContent=msg; }
-function getApiKey() { return localStorage.getItem(API_KEY_S)||''; }
-function goalTagClass(g) { return g==='컷팅'?'tag-cut':g==='린벌크'?'tag-bulk':g==='더티벌크'?'tag-dirty':g==='눈바디개선'?'tag-body':''; }
-function goalLabel(g) { return g==='눈바디개선'?'눈바디 개선':g||''; }
+function getApiKey()   { return localStorage.getItem(API_KEY_S)||''; }
+function goalLabel(g)  { return g==='눈바디개선'?'눈바디 개선':g||''; }
+function goalTagClass(g){ return g==='컷팅'?'tag-cut':g==='린벌크'?'tag-bulk':g==='더티벌크'?'tag-dirty':g==='눈바디개선'?'tag-body':''; }
+
+function applyOffset(r) {
+  const off = offsets[r.gym] || { muscle: 0, fat: 0 };
+  return {
+    ...r,
+    muscle: r.muscle != null ? +(r.muscle - off.muscle).toFixed(2) : null,
+    fat:    r.fat    != null ? +(r.fat    - off.fat).toFixed(2)    : null,
+  };
+}
+
+function getMostRecentGym() {
+  if (!records.length) return null;
+  return [...records].sort((a,b)=>b.date.localeCompare(a.date))[0]?.gym || null;
+}
 
 function getFilteredRecords() {
-  let arr = records.sort((a,b)=>a.date.localeCompare(b.date));
+  let arr = [...records].sort((a,b)=>a.date.localeCompare(b.date));
   if (curGym  && curGym  !== 'all') arr = arr.filter(r=>(r.gym||'')===curGym);
   if (curGoal && curGoal !== 'all') arr = arr.filter(r=>(r.goal||'')===curGoal);
   if (curRange==='all')  return arr;
@@ -465,99 +511,75 @@ function getFilteredRecords() {
   return arr;
 }
 
-function getMostRecentGym() {
-  if (!records.length) return null;
-  return [...records].sort((a,b)=>b.date.localeCompare(a.date))[0]?.gym || null;
-}
-
-function getUsedGoals() {
-  return [...new Set(records.map(r=>r.goal).filter(Boolean))];
-}
-
 // ── Event Binding ──────────────────────────────────────
 function bindEvents() {
-  // tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab, btn));
-  });
+  document.querySelectorAll('.tab-btn').forEach(btn =>
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab, btn))
+  );
 
-  // goal type buttons
   document.getElementById('goalTypeRow').addEventListener('click', e => {
-    const btn = e.target.closest('.gt-btn');
-    if (!btn) return;
+    const btn = e.target.closest('.gt-btn'); if (!btn) return;
     document.querySelectorAll('.gt-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     goalCfg.type = btn.dataset.goal;
     document.getElementById('goalFields').style.display = 'block';
     renderGoalProgress();
   });
-
-  // AI suggest goal
   document.getElementById('suggestGoalBtn').addEventListener('click', suggestGoal);
   document.getElementById('saveGoalBtn').addEventListener('click', () => {
     goalCfg.weight = parseFloat(document.getElementById('g-weight').value)||null;
     goalCfg.muscle = parseFloat(document.getElementById('g-muscle').value)||null;
     goalCfg.fat    = parseFloat(document.getElementById('g-fat').value)||null;
     goalCfg.fatpct = parseFloat(document.getElementById('g-fatpct').value)||null;
-    saveGoal();
-    renderGoalProgress();
+    saveGoal(); renderGoalProgress();
     showStatus('goalSuggestStatus','success','목표 저장 완료');
-    setTimeout(()=>{ document.getElementById('goalSuggestStatus').className='status'; },2000);
+    setTimeout(()=>document.getElementById('goalSuggestStatus').className='status', 2000);
   });
 
-  // gym management
+  document.getElementById('offsetToggle').addEventListener('click', () => {
+    const body = document.getElementById('offsetBody');
+    const chev = document.getElementById('offsetChevron');
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    chev.textContent = open ? '▼' : '▲';
+  });
+
   document.getElementById('addGymBtn').addEventListener('click', addGym);
   document.getElementById('newGymInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addGym(); });
-
-  // api key
   document.getElementById('saveApiKeyBtn').addEventListener('click', saveApiKey);
-
-  // xlsx
   document.getElementById('xlsxZone').addEventListener('click', ()=>document.getElementById('xlsxInput').click());
   document.getElementById('xlsxInput').addEventListener('change', e=>importXlsx(e.target.files[0]));
-
-  // image
   document.getElementById('imgZone').addEventListener('click', ()=>document.getElementById('imgInput').click());
   document.getElementById('imgInput').addEventListener('change', e=>addImages(e.target.files));
-
-  // extract & save
   document.getElementById('extractBtn').addEventListener('click', doExtract);
   document.getElementById('saveRecordBtn').addEventListener('click', saveRecord);
   document.getElementById('cancelExtractBtn').addEventListener('click', resetUpload);
 
-  // metric
-  document.querySelectorAll('.t-btn[data-metric]').forEach(btn => {
-    btn.addEventListener('click', ()=>{
+  document.querySelectorAll('.t-btn[data-metric]').forEach(btn =>
+    btn.addEventListener('click', () => {
       document.querySelectorAll('.t-btn[data-metric]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      curMetric = btn.dataset.metric;
-      buildChart();
-    });
-  });
-
-  // range
-  document.querySelectorAll('.t-btn[data-range]').forEach(btn => {
-    btn.addEventListener('click', ()=>{
+      btn.classList.add('active'); curMetric=btn.dataset.metric; buildChart();
+    })
+  );
+  document.querySelectorAll('.t-btn[data-range]').forEach(btn =>
+    btn.addEventListener('click', () => {
       document.querySelectorAll('.t-btn[data-range]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      curRange = btn.dataset.range;
+      btn.classList.add('active'); curRange=btn.dataset.range;
       document.getElementById('customRangeWrap').style.display = curRange==='custom'?'block':'none';
       renderStats(); buildChart();
-    });
-  });
+    })
+  );
   document.getElementById('rangeStart').addEventListener('input', e=>{ customStart=e.target.value.trim(); renderStats(); buildChart(); });
   document.getElementById('rangeEnd').addEventListener('input',   e=>{ customEnd  =e.target.value.trim(); renderStats(); buildChart(); });
 
-  // analysis
   document.getElementById('analysisBtn').addEventListener('click', runAnalysis);
+  document.getElementById('trendStartMonth').addEventListener('change', e=>{ trendStartMonth=e.target.value; renderMonthlyTrend(); });
+  document.getElementById('trendEndMonth').addEventListener('change',   e=>{ trendEndMonth  =e.target.value; renderMonthlyTrend(); });
 
-  // history
   document.getElementById('exportBtn').addEventListener('click', exportXlsx);
   document.getElementById('clearAllBtn').addEventListener('click', ()=>{
     if(confirm('전체 기록을 삭제할까요?')){ records=[]; saveRec(); renderAll(); }
   });
-
-  // edit modal
   document.getElementById('closeEditBtn').addEventListener('click', closeEdit);
   document.getElementById('cancelEditBtn').addEventListener('click', closeEdit);
   document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
@@ -571,296 +593,369 @@ function switchTab(id, btn) {
   document.getElementById('panel-'+id).classList.add('active');
   btn.classList.add('active');
   renderGymGoalToggles();
-  if (id==='chart')   { renderStats(); buildChart(); }
-  if (id==='history') { renderHistory(); }
+  if (id==='chart')    { renderStats(); buildChart(); }
+  if (id==='history')  { renderHistory(); }
+  if (id==='analysis') { renderMonthlyTrend(); }
 }
 
 // ── Gym / Goal Toggles ─────────────────────────────────
 function renderGymGoalToggles() {
   document.getElementById('gymList').innerHTML = gyms.map(g=>`<option value="${g}">`).join('');
-
-  // gym tags in management
   const tagsEl = document.getElementById('gymTags');
   tagsEl.innerHTML = gyms.length
     ? gyms.map(g=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:12px">${g}<button data-gym="${g}" class="rm-gym-btn" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0;line-height:1">✕</button></span>`).join('')
     : '<span style="font-size:11px;color:var(--text3)">아직 없음</span>';
   tagsEl.querySelectorAll('.rm-gym-btn').forEach(b=>b.addEventListener('click',()=>removeGym(b.dataset.gym)));
 
-  // sort gyms: most recent first
   const recentGym = getMostRecentGym();
   const sortedGyms = [...gyms].sort((a,b)=>{
-    if(a===recentGym) return -1;
-    if(b===recentGym) return 1;
-    return 0;
+    if(a===recentGym) return -1; if(b===recentGym) return 1; return 0;
   });
 
-  const usedGoals = getUsedGoals();
-
-  // render for each panel
   [['gymToggleChart','chart'],['gymToggleAnalysis','analysis'],['gymToggleHistory','history']].forEach(([id,ctx])=>{
-    const el = document.getElementById(id);
-    let html = `<span class="toggle-label">헬스장</span><button class="g-btn${curGym==='all'?' active':''}" data-gym="all" data-ctx="${ctx}">전체</button>`;
+    const el=document.getElementById(id);
+    let html=`<span class="toggle-label">헬스장</span><button class="g-btn${curGym==='all'?' active':''}" data-gym="all" data-ctx="${ctx}">전체</button>`;
     sortedGyms.forEach(g=>{ html+=`<button class="g-btn${curGym===g?' active':''}" data-gym="${g}" data-ctx="${ctx}">${g}</button>`; });
-    el.innerHTML = html;
+    el.innerHTML=html;
     el.querySelectorAll('.g-btn').forEach(b=>b.addEventListener('click',()=>setGym(b.dataset.gym,b.dataset.ctx)));
   });
 
   [['goalToggleChart','chart'],['goalToggleAnalysis','analysis'],['goalToggleHistory','history']].forEach(([id,ctx])=>{
-    const el = document.getElementById(id);
-    el.style.display='flex';
-    let html = `<span class="toggle-label">목표</span><button class="g-btn${curGoal==='all'?' active':''}" data-goal="all" data-ctx="${ctx}">전체</button>`;
+    const el=document.getElementById(id);
+    let html=`<span class="toggle-label">목표</span><button class="g-btn${curGoal==='all'?' active':''}" data-goal="all" data-ctx="${ctx}">전체</button>`;
     GOAL_TYPES.forEach(g=>{ html+=`<button class="g-btn${curGoal===g?' active':''}" data-goal="${g}" data-ctx="${ctx}">${goalLabel(g)}</button>`; });
-    el.innerHTML = html;
+    el.innerHTML=html;
     el.querySelectorAll('.g-btn').forEach(b=>b.addEventListener('click',()=>setGoalFilter(b.dataset.goal,b.dataset.ctx)));
   });
+
+  renderOffsetTable();
 }
 
 function setGym(gym, ctx) {
-  curGym = gym;
-  renderGymGoalToggles();
+  curGym=gym; renderGymGoalToggles();
   if(ctx==='history'){ renderHistory(); return; }
+  if(ctx==='analysis'){ renderMonthlyTrend(); return; }
   renderStats(); buildChart();
 }
-
 function setGoalFilter(goal, ctx) {
-  curGoal = goal;
-  renderGymGoalToggles();
+  curGoal=goal; renderGymGoalToggles();
   if(ctx==='history'){ renderHistory(); return; }
   renderStats(); buildChart();
 }
 
 function addGym() {
-  const input = document.getElementById('newGymInput');
-  const name = input.value.trim();
+  const input=document.getElementById('newGymInput');
+  const name=input.value.trim();
   if(!name||gyms.includes(name)){ input.value=''; return; }
   gyms.push(name); saveGyms(); input.value='';
   renderGymGoalToggles();
 }
-
 function removeGym(name) {
-  gyms = gyms.filter(g=>g!==name);
+  gyms=gyms.filter(g=>g!==name);
   if(curGym===name) curGym='all';
   saveGyms(); renderGymGoalToggles();
-  renderStats(); buildChart(); renderHistory();
+  renderStats(); buildChart(); renderHistory(); renderMonthlyTrend();
+}
+
+// ── Offset Table ───────────────────────────────────────
+function renderOffsetTable() {
+  const tbody = document.getElementById('offsetTableBody');
+  const nonRef = gyms.filter(g=>g!==REF_GYM);
+  if (!nonRef.length) { tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text3);font-size:11px;padding:6px 8px">헬스장을 추가하면 보정값 설정 가능</td></tr>'; return; }
+  tbody.innerHTML = nonRef.map(g => {
+    const off = offsets[g] || { muscle:0, fat:0 };
+    return `<tr>
+      <td style="padding:5px 8px;font-size:12px;color:var(--text)">${g}</td>
+      <td style="text-align:center">
+        <input class="offset-input" data-gym="${g}" data-field="muscle" type="number" step="0.05" value="${off.muscle}">
+      </td>
+      <td style="text-align:center">
+        <input class="offset-input" data-gym="${g}" data-field="fat" type="number" step="0.05" value="${off.fat}">
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.offset-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const gym=inp.dataset.gym, field=inp.dataset.field;
+      if(!offsets[gym]) offsets[gym]={muscle:0,fat:0};
+      offsets[gym][field]=parseFloat(inp.value)||0;
+      saveOffsets(); renderMonthlyTrend();
+    });
+  });
+}
+
+// ── Monthly Trend ──────────────────────────────────────
+function getMonthLabel(ym) {
+  const [y,m]=ym.split('.'); return `${y}년 ${parseInt(m)}월`;
+}
+
+function rateMonth(dm, df) {
+  if (dm == null) return { label:'기준월', color:'var(--text3)' };
+  if (dm >= 0.3  && df <= 0.2)        return { label:'이상적', color:'#4ade80' };
+  if (dm >= 0.2  && df < dm * 1.5)    return { label:'우위',   color:'#86efac' };
+  if (dm >= 0.1)                       return { label:'보통',   color:'var(--amber)' };
+  if (Math.abs(dm) < 0.1 && Math.abs(df||0) < 0.1) return { label:'정체', color:'var(--text3)' };
+  return { label:'주의', color:'var(--red)' };
+}
+
+function renderMonthlyTrend() {
+  // 보정 적용한 InBody 기록 전체
+  const corrected = records
+    .filter(r=>r.device==='InBody')
+    .map(applyOffset)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+
+  if (!corrected.length) {
+    document.getElementById('monthlyTrendTable').innerHTML='<p style="font-size:12px;color:var(--text3);padding:.5rem 0">InBody 기록이 없습니다.</p>';
+    return;
+  }
+
+  // 월 목록
+  const allMonths = [...new Set(corrected.map(r=>r.date.slice(0,5)))].sort();
+
+  // 드롭박스 채우기
+  const startSel=document.getElementById('trendStartMonth');
+  const endSel=document.getElementById('trendEndMonth');
+  const prevStart=trendStartMonth||startSel.value;
+  const prevEnd=trendEndMonth||endSel.value;
+  startSel.innerHTML=allMonths.map(m=>`<option value="${m}">${getMonthLabel(m)}</option>`).join('');
+  endSel.innerHTML=allMonths.map(m=>`<option value="${m}">${getMonthLabel(m)}</option>`).join('');
+
+  // 기본: 최근 12개월
+  if(!trendStartMonth){
+    const defaultStart=allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0];
+    startSel.value=defaultStart; trendStartMonth=defaultStart;
+  } else { startSel.value=trendStartMonth; }
+  if(!trendEndMonth){
+    endSel.value=allMonths[allMonths.length-1]; trendEndMonth=allMonths[allMonths.length-1];
+  } else { endSel.value=trendEndMonth; }
+
+  // 선택 범위 내 월만, 최대 12개
+  let months=allMonths.filter(m=>m>=trendStartMonth&&m<=trendEndMonth);
+  if(months.length>12) months=months.slice(-12);
+
+  // 월별 평균
+  const monthAvg = months.map(m=>{
+    const recs=corrected.filter(r=>r.date.slice(0,5)===m);
+    const avg=arr=>arr.length?+(arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(2):null;
+    return {
+      month:m,
+      muscle:avg(recs.filter(r=>r.muscle!=null).map(r=>r.muscle)),
+      fat:   avg(recs.filter(r=>r.fat!=null).map(r=>r.fat)),
+      n:recs.length
+    };
+  });
+
+  // 테이블 렌더
+  const sign=(v,inv)=>{
+    if(v==null) return '<span style="color:var(--text3)">—</span>';
+    const up=inv?v<0:v>0;
+    const sym=v>0?'▲':v<0?'▽':'─';
+    const col=v>0?(inv?'var(--red)':'var(--green)'):v<0?(inv?'var(--green)':'var(--red)'):'var(--text3)';
+    return `<span style="color:${col}">${sym}${Math.abs(v).toFixed(2)}</span>`;
+  };
+
+  const rows=monthAvg.map((cur,i)=>{
+    const prev=i>0?monthAvg[i-1]:null;
+    const dm=prev&&cur.muscle!=null&&prev.muscle!=null?+(cur.muscle-prev.muscle).toFixed(2):null;
+    const df=prev&&cur.fat!=null&&prev.fat!=null?+(cur.fat-prev.fat).toFixed(2):null;
+    const rate=rateMonth(dm,df);
+    const mStr=cur.muscle!=null?`${cur.muscle.toFixed(1)}`:'—';
+    const fStr=cur.fat!=null?`${cur.fat.toFixed(1)}`:'—';
+    const mChg=dm!=null?` (${sign(dm,false)})`:'';
+    const fChg=df!=null?` (${sign(df,true)})`:'';
+    return `<tr>
+      <td style="color:var(--text)">${getMonthLabel(cur.month)}<span style="font-size:10px;color:var(--text3);margin-left:4px">(${cur.n}회)</span></td>
+      <td>${mStr}${mChg} kg</td>
+      <td>${fStr}${fChg} kg</td>
+      <td><span style="color:${rate.color};font-family:'Noto Sans KR',sans-serif;font-size:12px">${rate.label}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('monthlyTrendTable').innerHTML=`
+    <table class="trend-table" style="margin-top:.5rem">
+      <thead><tr><th style="text-align:left">월</th><th>골격근량</th><th>체지방량</th><th>판정</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="font-size:10px;color:var(--text3);margin-top:.4rem">보정 적용값 · 전월 대비 증감 표기</p>`;
 }
 
 // ── Goal Card ──────────────────────────────────────────
 function renderGoalCard() {
   if(goalCfg.type){
-    document.querySelectorAll('.gt-btn').forEach(b=>{
-      b.classList.toggle('active', b.dataset.goal===goalCfg.type);
-    });
+    document.querySelectorAll('.gt-btn').forEach(b=>b.classList.toggle('active',b.dataset.goal===goalCfg.type));
     document.getElementById('goalFields').style.display='block';
-    document.getElementById('g-weight').value = goalCfg.weight??'';
-    document.getElementById('g-muscle').value = goalCfg.muscle??'';
-    document.getElementById('g-fat').value    = goalCfg.fat??'';
-    document.getElementById('g-fatpct').value = goalCfg.fatpct??'';
+    document.getElementById('g-weight').value=goalCfg.weight??'';
+    document.getElementById('g-muscle').value=goalCfg.muscle??'';
+    document.getElementById('g-fat').value=goalCfg.fat??'';
+    document.getElementById('g-fatpct').value=goalCfg.fatpct??'';
     renderGoalProgress();
   }
 }
-
 function renderGoalProgress() {
-  const el = document.getElementById('goalProgress');
-  const gw = parseFloat(document.getElementById('g-weight').value)||goalCfg.weight;
-  const gm = parseFloat(document.getElementById('g-muscle').value)||goalCfg.muscle;
-  const gf = parseFloat(document.getElementById('g-fat').value)||goalCfg.fat;
-  const gp = parseFloat(document.getElementById('g-fatpct').value)||goalCfg.fatpct;
-  const ib = records.filter(r=>r.device==='InBody').sort((a,b)=>b.date.localeCompare(a.date));
-  const last = ib[0];
+  const el=document.getElementById('goalProgress');
+  const gw=parseFloat(document.getElementById('g-weight').value)||goalCfg.weight;
+  const gm=parseFloat(document.getElementById('g-muscle').value)||goalCfg.muscle;
+  const gf=parseFloat(document.getElementById('g-fat').value)||goalCfg.fat;
+  const gp=parseFloat(document.getElementById('g-fatpct').value)||goalCfg.fatpct;
+  const ib=records.filter(r=>r.device==='InBody').sort((a,b)=>b.date.localeCompare(a.date));
+  const last=ib[0];
   if(!last||(!gw&&!gm&&!gf&&!gp)){ el.innerHTML=''; return; }
-
-  function progressBar(cur, goal, lowerBetter) {
-    if(!goal||cur==null) return null;
-    const diff = goal - cur;
-    const pct = lowerBetter
-      ? Math.max(0, Math.min(100, (1 - (cur-goal)/Math.max(cur,1))*100))
-      : Math.max(0, Math.min(100, (cur/goal)*100));
-    const done = lowerBetter ? cur <= goal : cur >= goal;
-    const color = done ? '#4ade80' : '#fbbf24';
-    return { pct: done?100:Math.round(pct), color, diff: (diff>0?'+':'')+diff.toFixed(1), done };
-  }
-
-  const rows = [
-    { label:'체중', cur:last.weight, goal:gw, lb:goalCfg.type==='컷팅'||goalCfg.type==='눈바디개선' },
-    { label:'골격근', cur:last.muscle, goal:gm, lb:false },
-    { label:'체지방', cur:last.fat, goal:gf, lb:true },
-    { label:'지방률', cur:last.fatpct, goal:gp, lb:true },
+  const rows=[
+    {label:'체중',cur:last.weight,goal:gw,lb:goalCfg.type==='컷팅'||goalCfg.type==='눈바디개선'},
+    {label:'골격근',cur:last.muscle,goal:gm,lb:false},
+    {label:'체지방',cur:last.fat,goal:gf,lb:true},
+    {label:'지방률',cur:last.fatpct,goal:gp,lb:true},
   ].filter(r=>r.goal!=null&&r.cur!=null);
-
-  el.innerHTML = rows.map(r=>{
-    const pb = progressBar(r.cur, r.goal, r.lb);
-    if(!pb) return '';
+  el.innerHTML=rows.map(r=>{
+    const done=r.lb?r.cur<=r.goal:r.cur>=r.goal;
+    const pct=done?100:Math.max(0,Math.min(100,r.lb?(1-(r.cur-r.goal)/Math.max(r.cur,1))*100:(r.cur/r.goal)*100));
+    const color=done?'#4ade80':'#fbbf24';
+    const diff=(r.goal-r.cur).toFixed(1);
     return `<div class="goal-row">
       <span class="gr-label">${r.label}</span>
-      <div class="goal-bar-wrap"><div class="goal-bar" style="width:${pb.pct}%;background:${pb.color}"></div></div>
-      <span class="gr-val">${r.cur} → ${r.goal} <span style="color:${pb.done?'#4ade80':'#fbbf24'}">(${pb.diff})</span></span>
+      <div class="goal-bar-wrap"><div class="goal-bar" style="width:${Math.round(pct)}%;background:${color}"></div></div>
+      <span class="gr-val">${r.cur} → ${r.goal} <span style="color:${color}">(${+diff>0?'+':''}${diff})</span></span>
     </div>`;
   }).join('');
 }
 
 async function suggestGoal() {
-  const key = getApiKey();
-  if(!key){ showStatus('goalSuggestStatus','error','API 키가 필요합니다.'); return; }
-  const goalType = goalCfg.type;
-  if(!goalType){ showStatus('goalSuggestStatus','error','목표 종류를 먼저 선택해주세요.'); return; }
-  const ib = records.filter(r=>r.device==='InBody').sort((a,b)=>b.date.localeCompare(a.date));
-  if(!ib.length){ showStatus('goalSuggestStatus','error','InBody 기록이 없습니다.'); return; }
-  const last = ib[0];
-  showStatus('goalSuggestStatus','loading','AI가 목표 수치를 계산 중...');
+  const key=getApiKey(); if(!key){ showStatus('goalSuggestStatus','error','API 키 필요'); return; }
+  const goalType=goalCfg.type; if(!goalType){ showStatus('goalSuggestStatus','error','목표 종류를 먼저 선택해주세요'); return; }
+  const ib=records.filter(r=>r.device==='InBody').sort((a,b)=>b.date.localeCompare(a.date));
+  if(!ib.length){ showStatus('goalSuggestStatus','error','InBody 기록이 없습니다'); return; }
+  const last=ib[0];
+  showStatus('goalSuggestStatus','loading','AI가 목표 수치 계산 중...');
   try {
-    const prompt = `38세 남성, 키 177cm. 현재 체성분: 체중 ${last.weight}kg, 골격근량 ${last.muscle??'?'}kg, 체지방량 ${last.fat}kg, 체지방률 ${last.fatpct}%.
-목표: ${goalType}. 이 목표에 적합한 현실적인 목표 수치를 제안해주세요.
-JSON만 반환: {"weight":숫자,"muscle":숫자,"fat":숫자,"fatpct":숫자,"reason":"한줄설명"}`;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+      body:JSON.stringify({contents:[{parts:[{text:`38세 남성 177cm. 현재: 체중 ${last.weight}kg, 골격근 ${last.muscle??'?'}kg, 체지방 ${last.fat}kg, 지방률 ${last.fatpct}%. 목표: ${goalType}. 적절한 목표 수치를 JSON만 반환: {"weight":숫자,"muscle":숫자,"fat":숫자,"fatpct":숫자,"reason":"한줄설명"}`}]}]})
     });
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
-    const p = JSON.parse(text.replace(/```json|```/g,'').trim());
-    document.getElementById('g-weight').value = p.weight??'';
-    document.getElementById('g-muscle').value = p.muscle??'';
-    document.getElementById('g-fat').value    = p.fat??'';
-    document.getElementById('g-fatpct').value = p.fatpct??'';
-    showStatus('goalSuggestStatus','success', p.reason||'제안 완료 — 수정 후 저장하세요');
+    const data=await res.json();
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
+    const p=JSON.parse(text.replace(/```json|```/g,'').trim());
+    document.getElementById('g-weight').value=p.weight??'';
+    document.getElementById('g-muscle').value=p.muscle??'';
+    document.getElementById('g-fat').value=p.fat??'';
+    document.getElementById('g-fatpct').value=p.fatpct??'';
+    showStatus('goalSuggestStatus','success',p.reason||'제안 완료 — 수정 후 저장하세요');
     renderGoalProgress();
-  } catch(e) {
-    showStatus('goalSuggestStatus','error','제안 실패: '+e.message);
-  }
+  } catch(e){ showStatus('goalSuggestStatus','error','제안 실패: '+e.message); }
 }
 
 // ── API Key ────────────────────────────────────────────
 function saveApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  if(!key) return;
-  localStorage.setItem(API_KEY_S, key);
+  const key=document.getElementById('apiKeyInput').value.trim(); if(!key) return;
+  localStorage.setItem(API_KEY_S,key);
   document.getElementById('apiKeyInput').value='';
   updateApiKeyBadge();
   showStatus('extractStatus','success','API 키 저장 완료');
 }
 function updateApiKeyBadge() {
-  const el = document.getElementById('apiKeyBadge');
-  const ok = !!getApiKey();
-  el.style.background = ok?'rgba(74,222,128,0.12)':'rgba(248,113,113,0.12)';
-  el.style.color = ok?'#4ade80':'#f87171';
-  el.textContent = ok?'설정됨':'미설정';
+  const el=document.getElementById('apiKeyBadge'); const ok=!!getApiKey();
+  el.style.background=ok?'rgba(74,222,128,0.12)':'rgba(248,113,113,0.12)';
+  el.style.color=ok?'#4ade80':'#f87171'; el.textContent=ok?'설정됨':'미설정';
 }
 
 // ── Image Upload ───────────────────────────────────────
 function addImages(files) {
   Array.from(files).forEach(file=>{
-    const reader = new FileReader();
-    reader.onload = e=>{
-      selectedImages.push({ base64:e.target.result.split(',')[1], mediaType:file.type||'image/jpeg', url:URL.createObjectURL(file) });
-      renderThumbs();
-    };
+    const reader=new FileReader();
+    reader.onload=e=>{ selectedImages.push({base64:e.target.result.split(',')[1],mediaType:file.type||'image/jpeg',url:URL.createObjectURL(file)}); renderThumbs(); };
     reader.readAsDataURL(file);
   });
   document.getElementById('imgInput').value='';
 }
 function renderThumbs() {
-  document.getElementById('thumbRow').innerHTML = selectedImages.map((img,i)=>
+  document.getElementById('thumbRow').innerHTML=selectedImages.map((img,i)=>
     `<div class="thumb"><img src="${img.url}"><button class="del" data-i="${i}">✕</button></div>`
   ).join('');
   document.getElementById('thumbRow').querySelectorAll('.del').forEach(b=>
     b.addEventListener('click',()=>{ selectedImages.splice(+b.dataset.i,1); renderThumbs(); })
   );
-  document.getElementById('extractBtn').disabled = !selectedImages.length;
+  document.getElementById('extractBtn').disabled=!selectedImages.length;
 }
 function resetUpload() {
-  selectedImages=[];
-  renderThumbs();
+  selectedImages=[]; renderThumbs();
   document.getElementById('extractedCard').style.display='none';
   document.getElementById('extractStatus').className='status';
-  document.getElementById('f-gym').value='';
-  document.getElementById('f-goal').value='';
+  document.getElementById('f-gym').value=''; document.getElementById('f-goal').value='';
 }
 
 // ── Extract ────────────────────────────────────────────
 async function doExtract() {
   if(!selectedImages.length) return;
-  const key = getApiKey();
-  if(!key){ showStatus('extractStatus','error','Gemini API 키를 먼저 입력해주세요.'); return; }
+  const key=getApiKey(); if(!key){ showStatus('extractStatus','error','Gemini API 키를 먼저 입력해주세요.'); return; }
   showStatus('extractStatus','loading',`${selectedImages.length}장 이미지에서 수치 추출 중...`);
   document.getElementById('extractedCard').style.display='none';
   document.getElementById('extractBtn').disabled=true;
-  const parts = selectedImages.map(img=>({inline_data:{mime_type:img.mediaType,data:img.base64}}));
-  const today = todayStr();
-parts.push({text:`아래 이미지(${selectedImages.length}장)는 InBody 또는 ACCUNIQ 체성분 측정 결과입니다. 앱 스크린샷이거나 인쇄된 A4 용지 사진일 수 있습니다. 모든 이미지를 꼼꼼히 읽어 6개 수치를 추출하세요. 반드시 JSON만 반환하고 다른 텍스트는 쓰지 마세요.
+  const parts=selectedImages.map(img=>({inline_data:{mime_type:img.mediaType,data:img.base64}}));
+  const today=todayStr();
+  parts.push({text:`아래 이미지(${selectedImages.length}장)는 InBody 또는 ACCUNIQ 체성분 측정 결과입니다. 앱 스크린샷이거나 인쇄된 A4 용지 사진일 수 있습니다. 모든 이미지를 꼼꼼히 읽어 6개 수치를 추출하세요. 반드시 JSON만 반환하고 다른 텍스트는 쓰지 마세요.
 
 {"date":"YY.MM.DD","device":"InBody","weight":숫자,"muscle":숫자또는null,"fat":숫자또는null,"fatpct":숫자또는null,"bmr":숫자또는null,"water":숫자또는null}
 
 각 항목 찾는 방법:
 1. date: 검사일시 날짜. "2026.06.25 19:18" 이면 "26.06.25". 없으면 "${today}"
 2. device: InBody 로고나 InBody570 등 기재 → "InBody". ACCUNIQ → "ACCUNIQ"
-3. weight: "체중(kg)" 또는 "Weight(kg)" 항목의 수치. 골격근·지방분석 표에서 체중 행의 숫자 (예: 68.1)
+3. weight: "체중(kg)" 또는 "Weight(kg)" 항목의 수치 (예: 68.1)
 4. muscle: "골격근량(kg)" 또는 "Skeletal Muscle Mass(kg)" 수치 (예: 33.8)
-5. fat: "체지방량(kg)" 또는 "Body Fat Mass(kg)" 수치 (예: 8.1). 체성분분석 표 하단 체지방 행
-6. fatpct: "체지방률(%)" 또는 "Percent Body Fat(%)" 수치. 비만분석 섹션에 있음 (예: 11.8)
-7. bmr: "기초대사량(kcal)" 수치. 연구항목 섹션 또는 우측 표에 있음 (예: 1667)
-8. water: "체수분(L)" 또는 "Total Body Water(L)" 수치. 체성분분석 표 상단 (예: 44.0)
+5. fat: "체지방량(kg)" 또는 "Body Fat Mass(kg)" 수치 (예: 8.1)
+6. fatpct: "체지방률(%)" 또는 "Percent Body Fat(%)" 수치 (예: 11.8)
+7. bmr: "기초대사량(kcal)" 수치 (예: 1667)
+8. water: "체수분(L)" 수치 (예: 44.0)
 
-주의사항:
-- 단백질(Protein), 무기질(Minerals), BMI는 추출하지 않음
-- 광고·팝업은 무시
-- 수치가 보이지 않으면 null
-- 단위 제외하고 숫자만`});
+주의: 단백질·무기질·BMI는 추출하지 않음. 광고·팝업 무시. 없으면 null. 숫자만.`});
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts}],
-        generationConfig:{ response_mime_type:'application/json', temperature:0 }
-      })
+      body:JSON.stringify({contents:[{parts}],generationConfig:{response_mime_type:'application/json',temperature:0}})
     });
-    const data = await res.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
-    if(!rawText){ showStatus('extractStatus','error','모델 응답 없음: '+JSON.stringify(data).slice(0,200)); document.getElementById('extractBtn').disabled=false; return; }
-    const p = JSON.parse(rawText.replace(/```json|```/g,'').trim());
-    document.getElementById('f-date').value   = p.date  ??today;
-    document.getElementById('f-device').value = p.device??'InBody';
-    document.getElementById('f-weight').value = p.weight??'';
-    document.getElementById('f-muscle').value = p.muscle??'';
-    document.getElementById('f-fat').value    = p.fat   ??'';
-    document.getElementById('f-fatpct').value = p.fatpct??'';
-    document.getElementById('f-bmr').value    = p.bmr   ??'';
-    document.getElementById('f-water').value  = p.water ??'';
-    document.getElementById('f-gym').value    = '';
-    document.getElementById('f-goal').value   = goalCfg.type||'';
-    const allNull = [p.weight,p.muscle,p.fat,p.fatpct].every(v=>v==null);
-    if(allNull){
-      showStatus('extractStatus','error','수치 추출 실패. 모델 응답: '+rawText.slice(0,150));
-    } else {
-      showStatus('extractStatus','success','추출 완료 — 헬스장·목표 확인 후 저장');
-    }
+    const data=await res.json();
+    const rawText=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
+    if(!rawText) throw new Error('응답 없음: '+JSON.stringify(data?.error||'').slice(0,100));
+    let p; try{ p=JSON.parse(rawText.replace(/```json|```/g,'').trim()); } catch(e){ throw new Error('JSON 파싱 실패: '+rawText.slice(0,150)); }
+    document.getElementById('f-date').value=p.date??today;
+    document.getElementById('f-device').value=p.device??'InBody';
+    document.getElementById('f-weight').value=p.weight??'';
+    document.getElementById('f-muscle').value=p.muscle??'';
+    document.getElementById('f-fat').value=p.fat??'';
+    document.getElementById('f-fatpct').value=p.fatpct??'';
+    document.getElementById('f-bmr').value=p.bmr??'';
+    document.getElementById('f-water').value=p.water??'';
+    document.getElementById('f-gym').value='';
+    document.getElementById('f-goal').value=goalCfg.type||'';
+    const allNull=[p.weight,p.muscle,p.fat,p.fatpct].every(v=>v==null);
+    if(allNull){ showStatus('extractStatus','error','수치 추출 실패. 모델 응답: '+rawText.slice(0,200)); }
+    else { showStatus('extractStatus','success','추출 완료 — 헬스장·목표 확인 후 저장'); }
     document.getElementById('extractedCard').style.display='block';
     document.getElementById('f-gym').focus();
-  } catch(e) {
-    showStatus('extractStatus','error','추출 실패 — 잠시 후 다시 시도해주세요');
-    document.getElementById('extractedCard').style.display='block';
-  }
+  } catch(e){ showStatus('extractStatus','error','추출 실패: '+e.message); document.getElementById('extractedCard').style.display='block'; }
   document.getElementById('extractBtn').disabled=false;
 }
 
 // ── Save Record ────────────────────────────────────────
 function saveRecord() {
-  const date   = document.getElementById('f-date').value.trim();
-  const device = document.getElementById('f-device').value;
-  const gym    = document.getElementById('f-gym').value.trim();
-  const goal   = document.getElementById('f-goal').value;
-  const weight = parseFloat(document.getElementById('f-weight').value);
-  const muscle = parseFloat(document.getElementById('f-muscle').value)||null;
-  const fat    = parseFloat(document.getElementById('f-fat').value);
-  const fatpct = parseFloat(document.getElementById('f-fatpct').value);
-  const bmr    = parseFloat(document.getElementById('f-bmr').value)||null;
-  const water  = parseFloat(document.getElementById('f-water').value)||null;
+  const date=document.getElementById('f-date').value.trim();
+  const device=document.getElementById('f-device').value;
+  const gym=document.getElementById('f-gym').value.trim();
+  const goal=document.getElementById('f-goal').value;
+  const weight=parseFloat(document.getElementById('f-weight').value);
+  const muscle=parseFloat(document.getElementById('f-muscle').value)||null;
+  const fat=parseFloat(document.getElementById('f-fat').value);
+  const fatpct=parseFloat(document.getElementById('f-fatpct').value);
+  const bmr=parseFloat(document.getElementById('f-bmr').value)||null;
+  const water=parseFloat(document.getElementById('f-water').value)||null;
   if(!date||isNaN(weight)||isNaN(fat)||isNaN(fatpct)){ showStatus('extractStatus','error','날짜, 체중, 체지방량, 체지방률은 필수'); return; }
-  const rec = {date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water};
-  const idx = records.findIndex(r=>r.date===date&&r.device===device);
+  const rec={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water};
+  const idx=records.findIndex(r=>r.date===date&&r.device===device);
   if(idx>=0){ if(!confirm(`${date} ${device} 기록이 있습니다. 덮어쓸까요?`)) return; records[idx]=rec; }
   else records.push(rec);
   records.sort((a,b)=>a.date.localeCompare(b.date));
   saveRec();
+  // 새 헬스장 자동 등록
+  if(gym && !gyms.includes(gym)){ gyms.push(gym); saveGyms(); }
   showStatus('extractStatus','success',`${date} ${device}${gym?' · '+gym:''} 저장 완료`);
   setTimeout(resetUpload,1500);
   renderAll();
@@ -871,13 +966,13 @@ async function importXlsx(file) {
   if(!file) return;
   showStatus('xlsxStatus','loading','읽는 중...');
   try {
-    const buf = await file.arrayBuffer();
-    const wb  = XLSX.read(buf,{type:'array'});
-    const ws  = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws,{header:1});
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1});
     let hr=0;
     for(let i=0;i<Math.min(5,rows.length);i++){ if(rows[i].some(c=>String(c).includes('날짜')||String(c).includes('체중'))){ hr=i; break; } }
-    const headers = rows[hr].map(h=>String(h??'').trim());
+    const headers=rows[hr].map(h=>String(h??'').trim());
     const ix={
       date:  headers.findIndex(h=>h.includes('날짜')),
       weight:headers.findIndex(h=>h.includes('체중')),
@@ -893,42 +988,35 @@ async function importXlsx(file) {
     if(ix.date<0||ix.weight<0){ showStatus('xlsxStatus','error','날짜/체중 컬럼 없음'); return; }
     let imported=0,skipped=0;
     for(let i=hr+1;i<rows.length;i++){
-      const row=rows[i];
-      if(!row?.[ix.date]) continue;
-      const date=String(row[ix.date]??'').trim();
-      if(!date) continue;
+      const row=rows[i]; if(!row?.[ix.date]) continue;
+      const date=String(row[ix.date]??'').trim(); if(!date) continue;
       const weight=parseFloat(row[ix.weight]),fat=parseFloat(row[ix.fat]),fatpct=parseFloat(row[ix.fatpct]);
       if(isNaN(weight)||isNaN(fat)||isNaN(fatpct)){ skipped++; continue; }
       const muscle=ix.muscle>=0?(parseFloat(row[ix.muscle])||null):null;
       const bmr=ix.bmr>=0?(parseFloat(row[ix.bmr])||null):null;
       const water=ix.water>=0?(parseFloat(row[ix.water])||null):null;
       let device=ix.device>=0?String(row[ix.device]??'').trim():'ACCUNIQ';
-      if(!device) device='ACCUNIQ';
-      if(date<=CUTOFF_IB) device='InBody';
+      if(!device) device='ACCUNIQ'; if(date<=CUTOFF_IB) device='InBody';
       const gym=ix.gym>=0?String(row[ix.gym]??'').trim():'';
       const goal=ix.goal>=0?String(row[ix.goal]??'').trim():'';
       const rec={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water};
       const ei=records.findIndex(r=>r.date===date&&r.device===device);
       if(ei>=0) records[ei]=rec; else records.push(rec);
+      if(gym&&!gyms.includes(gym)){ gyms.push(gym); }
       imported++;
     }
     records.sort((a,b)=>a.date.localeCompare(b.date));
-    saveRec(); renderAll();
+    saveRec(); saveGyms(); renderAll();
     showStatus('xlsxStatus','success',`${imported}개 가져오기 완료${skipped?` (${skipped}개 건너뜀)`:''}`);
     document.getElementById('xlsxInput').value='';
   } catch(e){ showStatus('xlsxStatus','error','파일 읽기 실패: '+e.message); }
 }
 
-// ── Xlsx Export ────────────────────────────────────────
 function exportXlsx() {
   if(!records.length){ alert('기록이 없습니다.'); return; }
   const sorted=[...records].sort((a,b)=>a.date.localeCompare(b.date));
-  const ws=XLSX.utils.json_to_sheet(sorted.map(r=>({
-    '날짜':r.date,'체중':r.weight,'근육':r.muscle??'','지방량':r.fat,'지방률':r.fatpct,
-    '기초대사량':r.bmr??'','체수분':r.water??'','기기':r.device,'헬스장':r.gym??'','목표':r.goal??''
-  })));
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
+  const ws=XLSX.utils.json_to_sheet(sorted.map(r=>({'날짜':r.date,'체중':r.weight,'근육':r.muscle??'','지방량':r.fat,'지방률':r.fatpct,'기초대사량':r.bmr??'','체수분':r.water??'','기기':r.device,'헬스장':r.gym??'','목표':r.goal??''})));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
   XLSX.writeFile(wb,`체성분_${todayStr().replace(/\./g,'')}.xlsx`);
 }
 
@@ -939,6 +1027,7 @@ function renderAll() {
   renderHistory();
   renderStats();
   buildChart();
+  renderMonthlyTrend();
 }
 
 // ── Stats ──────────────────────────────────────────────
@@ -965,17 +1054,15 @@ function renderStats() {
 
 // ── Chart ──────────────────────────────────────────────
 const METRIC_CFG={
-  weight:{label:'체중',unit:'kg',key:'weight',color:'#60a5fa',min:55,max:92},
-  muscle:{label:'골격근량',unit:'kg',key:'muscle',color:'#4ade80',min:28,max:38},
-  fat:{label:'체지방량',unit:'kg',key:'fat',color:'#f87171',min:0,max:32},
-  fatpct:{label:'체지방률',unit:'%',key:'fatpct',color:'#fbbf24',min:5,max:36},
-  bmr:{label:'기초대사량',unit:'kcal',key:'bmr',color:'#a78bfa',min:1400,max:1900},
+  weight:{label:'체중',unit:'kg',key:'weight',min:55,max:92},
+  muscle:{label:'골격근량',unit:'kg',key:'muscle',min:28,max:38},
+  fat:{label:'체지방량',unit:'kg',key:'fat',min:0,max:32},
+  fatpct:{label:'체지방률',unit:'%',key:'fatpct',min:5,max:36},
+  bmr:{label:'기초대사량',unit:'kcal',key:'bmr',min:1400,max:1900},
 };
 function buildChart() {
   const cfg=METRIC_CFG[curMetric];
-  const gymStr=curGym!=='all'?` — ${curGym}`:'';
-  const goalStr=curGoal!=='all'?` [${goalLabel(curGoal)}]`:'';
-  document.getElementById('chartTitle').textContent=`${cfg.label} 추이${gymStr}${goalStr}`;
+  document.getElementById('chartTitle').textContent=`${cfg.label} 추이${curGym!=='all'?' — '+curGym:''}${curGoal!=='all'?' ['+goalLabel(curGoal)+']':''}`;
   const ib=getFilteredRecords().filter(r=>r.device==='InBody');
   if(chart){chart.destroy();chart=null;}
   if(!ib.length) return;
@@ -1003,45 +1090,40 @@ function buildChart() {
 // ── History ────────────────────────────────────────────
 function renderHistory() {
   let list=[...records].sort((a,b)=>b.date.localeCompare(a.date));
-  if(curGym&&curGym!=='all') list=list.filter(r=>(r.gym||'')===curGym);
   if(curGoal&&curGoal!=='all') list=list.filter(r=>(r.goal||'')===curGoal);
   document.getElementById('recordCount').textContent=`총 ${records.length}개 기록${curGym!=='all'?' ('+curGym+')':''}${curGoal!=='all'?' ['+goalLabel(curGoal)+']':''}`;
   const tbody=document.getElementById('historyBody');
-  if(!list.length){tbody.innerHTML=`<tr><td colspan="11" class="empty">기록이 없습니다.</td></tr>`;return;}
+  if(!list.length){ tbody.innerHTML=`<tr><td colspan="11" class="empty">기록이 없습니다.</td></tr>`; return; }
   tbody.innerHTML=list.map(r=>{
     const oi=records.indexOf(r);
-    const phase=getPhase(r.date);
-    const devTag=r.device==='InBody'?`<span class="tag tag-ib">InBody</span>`:`<span class="tag tag-ac">ACCUNIQ</span>`;
-    const phaseTag=phase==='bulk'?`<span class="tag tag-phase-bulk">린벌크</span>`:`<span class="tag tag-phase-cut">감량</span>`;
-    const goalTag=r.goal?`<span class="tag ${goalTagClass(r.goal)}">${goalLabel(r.goal)}</span>`:`<span style="color:var(--text3)">-</span>`;
-    const gymText=r.gym?`<span style="font-size:11px;color:var(--text2);font-family:'Noto Sans KR',sans-serif">${r.gym}</span>`:`<span style="color:var(--text3)">-</span>`;
     return `<tr>
       <td><span onclick="editRecord(${oi})" style="cursor:pointer;color:var(--blue);text-decoration:underline dotted;text-underline-offset:3px">${r.date}</span></td>
-      <td>${devTag}</td><td>${gymText}</td><td>${goalTag}</td>
+      <td><span class="tag ${r.device==='InBody'?'tag-ib':'tag-ac'}">${r.device}</span></td>
+      <td><span style="font-size:11px;color:var(--text2);font-family:'Noto Sans KR',sans-serif">${r.gym||'-'}</span></td>
+      <td>${r.goal?`<span class="tag ${goalTagClass(r.goal)}">${goalLabel(r.goal)}</span>`:'<span style="color:var(--text3)">-</span>'}</td>
       <td>${r.weight}</td><td>${r.muscle??'-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td><td>${r.bmr??'-'}</td>
-      <td>${phaseTag}</td>
+      <td><span class="tag ${getPhase(r.date)==='bulk'?'tag-bulk':'tag-cut'}">${getPhase(r.date)==='bulk'?'린벌크':'감량'}</span></td>
       <td style="white-space:nowrap">
         <button class="icon-btn edit" onclick="editRecord(${oi})" title="수정">✏️</button>
         <button class="icon-btn" onclick="deleteRecord(${oi})" title="삭제">✕</button>
       </td></tr>`;
   }).join('');
 }
-
 function deleteRecord(i){ if(confirm('삭제할까요?')){ records.splice(i,1); saveRec(); renderAll(); } }
 
 // ── Edit Modal ─────────────────────────────────────────
 function editRecord(i) {
   editIdx=i; const r=records[i];
-  document.getElementById('e-date').value   = r.date;
-  document.getElementById('e-device').value = r.device;
-  document.getElementById('e-gym').value    = r.gym||'';
-  document.getElementById('e-goal').value   = r.goal||'';
-  document.getElementById('e-weight').value = r.weight;
-  document.getElementById('e-muscle').value = r.muscle??'';
-  document.getElementById('e-fat').value    = r.fat;
-  document.getElementById('e-fatpct').value = r.fatpct;
-  document.getElementById('e-bmr').value    = r.bmr??'';
-  document.getElementById('e-water').value  = r.water??'';
+  document.getElementById('e-date').value=r.date;
+  document.getElementById('e-device').value=r.device;
+  document.getElementById('e-gym').value=r.gym||'';
+  document.getElementById('e-goal').value=r.goal||'';
+  document.getElementById('e-weight').value=r.weight;
+  document.getElementById('e-muscle').value=r.muscle??'';
+  document.getElementById('e-fat').value=r.fat;
+  document.getElementById('e-fatpct').value=r.fatpct;
+  document.getElementById('e-bmr').value=r.bmr??'';
+  document.getElementById('e-water').value=r.water??'';
   document.getElementById('editModal').classList.add('open');
 }
 function closeEdit(){ document.getElementById('editModal').classList.remove('open'); editIdx=-1; }
@@ -1057,7 +1139,7 @@ function saveEdit() {
   const fatpct=parseFloat(document.getElementById('e-fatpct').value);
   const bmr=parseFloat(document.getElementById('e-bmr').value)||null;
   const water=parseFloat(document.getElementById('e-water').value)||null;
-  if(!date||isNaN(weight)||isNaN(fat)||isNaN(fatpct)){alert('날짜, 체중, 체지방량, 체지방률은 필수');return;}
+  if(!date||isNaN(weight)||isNaN(fat)||isNaN(fatpct)){ alert('날짜, 체중, 체지방량, 체지방률은 필수'); return; }
   records[editIdx]={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water};
   records.sort((a,b)=>a.date.localeCompare(b.date));
   saveRec(); closeEdit(); renderAll();
@@ -1065,72 +1147,65 @@ function saveEdit() {
 
 // ── Analysis ───────────────────────────────────────────
 async function runAnalysis() {
-  let ib = records.sort((a,b)=>a.date.localeCompare(b.date));
+  let ib=[...records].sort((a,b)=>a.date.localeCompare(b.date));
   if(curGym&&curGym!=='all')   ib=ib.filter(r=>(r.gym||'')===curGym);
   if(curGoal&&curGoal!=='all') ib=ib.filter(r=>(r.goal||'')===curGoal);
-  if(ib.length<3){showStatus('analysisStatus','error','기록이 3개 이상 필요합니다.');return;}
-  const key=getApiKey();
-  if(!key){showStatus('analysisStatus','error','Gemini API 키가 필요합니다.');return;}
-  showStatus('analysisStatus','loading',`분석 중${curGym!=='all'?' ('+curGym+')':''}${curGoal!=='all'?' ['+goalLabel(curGoal)+']':''}...`);
-  document.getElementById('analysisResult').innerHTML='';
-  document.getElementById('analysisBtn').disabled=true;
-
-  const last=ib[ib.length-1],prev=ib[ib.length-2];
+  if(ib.length<3){ showStatus('analysisStatus','error','기록이 3개 이상 필요합니다.'); return; }
+  const key=getApiKey(); if(!key){ showStatus('analysisStatus','error','Gemini API 키가 필요합니다.'); return; }
+  const last=ib[ib.length-1];
+  const sameGym=last.gym||'';
+  const sameGymRecs=ib.filter(r=>(r.gym||'')===sameGym).sort((a,b)=>a.date.localeCompare(b.date));
+  const sameGymPrev=sameGymRecs.length>=2?sameGymRecs[sameGymRecs.length-2]:null;
+  const recent7=sameGymRecs.slice(-7);
   const bulk=ib.filter(r=>r.date>=BULK_START);
-  const d7=new Date();d7.setDate(d7.getDate()-7);
-  const week=ib.filter(r=>r.date>=fmtDate(d7));
   const activeGoalType=curGoal!=='all'?curGoal:(goalCfg.type||'린벌크');
-  const goalTargets=goalCfg.type===activeGoalType
-    ?`목표 수치: 체중 ${goalCfg.weight??'미설정'}kg, 골격근 ${goalCfg.muscle??'미설정'}kg, 체지방 ${goalCfg.fat??'미설정'}kg, 지방률 ${goalCfg.fatpct??'미설정'}%`
-    :'목표 수치 미설정';
-
+  function sameGymPrevMonthAvg(){
+    const [yr,mo]=last.date.split('.').map(Number);
+    let pmo=mo-1,pyr=yr; if(pmo<1){pmo=12;pyr--;}
+    const prefix=`${String(pyr).padStart(2,'0')}.${String(pmo).padStart(2,'0')}.`;
+    const arr=sameGymRecs.filter(r=>r.date.startsWith(prefix));
+    if(!arr.length) return null;
+    const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+    return{month:`${pyr}년 ${pmo}월`,
+      weight:+avg(arr.map(r=>r.weight)).toFixed(1),
+      muscle:arr.some(r=>r.muscle)?+avg(arr.filter(r=>r.muscle).map(r=>r.muscle)).toFixed(1):null,
+      fat:+avg(arr.map(r=>r.fat)).toFixed(1),
+      fatpct:+avg(arr.map(r=>r.fatpct)).toFixed(1),n:arr.length};
+  }
+  const pmAvg=sameGymPrevMonthAvg();
   function calcRel(last,prev){
-    if(!prev) return {score:100,reasons:['첫 번째 기록']};
+    if(!prev) return{score:100,reasons:['동일 헬스장 첫 기록']};
+    let score=100; const reasons=[];
+    const dm=last.muscle!=null&&prev.muscle!=null?last.muscle-prev.muscle:0;
+    const df=last.fat-prev.fat;
     const dA=new Date(2000+parseInt(prev.date.split('.')[0]),parseInt(prev.date.split('.')[1])-1,parseInt(prev.date.split('.')[2]));
     const dB=new Date(2000+parseInt(last.date.split('.')[0]),parseInt(last.date.split('.')[1])-1,parseInt(last.date.split('.')[2]));
     const days=Math.round((dB-dA)/86400000);
-    let score=100;const reasons=[];
-    const dm=last.muscle!=null&&prev.muscle!=null?last.muscle-prev.muscle:0;
-    const df=last.fat-prev.fat,dw=last.weight-prev.weight;
-    if(Math.abs(dm)>1.5){score-=35;reasons.push(`골격근 ${dm>0?'+':''}${dm.toFixed(1)}kg 단기 급변 — 수분 변동 가능`);}
+    if(Math.abs(dm)>1.5){score-=35;reasons.push(`골격근 ${dm>0?'+':''}${dm.toFixed(1)}kg 단기 급변`);}
     else if(Math.abs(dm)>0.8){score-=20;reasons.push(`골격근 변화폭 주의 (${dm>0?'+':''}${dm.toFixed(1)}kg)`);}
-    if(Math.abs(df)>1.2&&days<=3){score-=25;reasons.push(`${days}일 만에 체지방 ${df>0?'+':''}${df.toFixed(1)}kg — 실제 변화 가능성 낮음`);}
+    if(Math.abs(df)>1.2&&days<=3){score-=25;reasons.push(`${days}일 만에 체지방 ${df>0?'+':''}${df.toFixed(1)}kg`);}
     else if(Math.abs(df)>0.8&&days<=2){score-=15;reasons.push('단기 체지방 변화 — 수분 영향 의심');}
-    if(Math.abs(dw-(dm+df))>1.0){score-=10;reasons.push('체중 변화와 근육·지방 합산 불일치');}
     if(new Date(2000+parseInt(last.date.split('.')[0]),parseInt(last.date.split('.')[1])-1,parseInt(last.date.split('.')[2])).getDay()===1){score-=10;reasons.push('월요일 측정 — 주말 영향 빈번');}
     if(!reasons.length) reasons.push('직전 대비 정상 범위');
-    return {score:Math.max(0,Math.min(100,score)),reasons};
+    return{score:Math.max(0,Math.min(100,score)),reasons};
   }
-
-  function prevMonthAvg(){
-    const [yr,mo]=last.date.split('.').map(Number);
-    let pmo=mo-1,pyr=yr;if(pmo<1){pmo=12;pyr--;}
-    const prefix=`${String(pyr).padStart(2,'0')}.${String(pmo).padStart(2,'0')}.`;
-    const arr=bulk.filter(r=>r.date.startsWith(prefix));
-    if(!arr.length) return null;
-    const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
-    return{month:`${pyr}년 ${pmo}월`,weight:+avg(arr.map(r=>r.weight)).toFixed(1),
-      muscle:arr.some(r=>r.muscle)?+avg(arr.filter(r=>r.muscle).map(r=>r.muscle)).toFixed(1):null,
-      fat:+avg(arr.map(r=>r.fat)).toFixed(1),fatpct:+avg(arr.map(r=>r.fatpct)).toFixed(1),n:arr.length};
-  }
-
-  const rel=calcRel(last,prev);
-  const pmAvg=prevMonthAvg();
-  const gymNote=curGym!=='all'?`\n헬스장 필터: ${curGym}`:'';
-  const goalNote=`\n현재 목표: ${activeGoalType}\n${goalTargets}`;
-
-  const prompt=`InBody/ACCUNIQ 체성분 데이터. 38세 남성(177cm).${gymNote}${goalNote}
-목표(${activeGoalType})에 맞춰 분석해주세요.
-데이터: ${JSON.stringify({시작:bulk[0]??ib[0],최신:last,직전:prev,전월평균:pmAvg,최근7일:week,최근20개:ib.slice(-20)})}
-JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_points":["핵심1","핵심2","핵심3"],"prev_points":["전월비교1","전월비교2"]},"week":{"body":"2문장"},"warning":{"grade":"good|caution|warn","badge":"정상범위|주의|경고","body":"2문장"},"goal_gap":{"body":"목표 대비 현재 차이 및 달성 가능성 2문장"},"advice":{"body":"${activeGoalType} 목표 기반 행동 조언 2문장"}}`;
-
+  const rel=calcRel(last,sameGymPrev);
+  const janRec=ib.find(r=>r.date>='26.01.01');
+  const slim=r=>({date:r.date,w:r.weight,m:r.muscle,f:r.fat,fp:r.fatpct});
+  showStatus('analysisStatus','loading',`분석 중${sameGym?' ('+sameGym+')':''}...`);
+  document.getElementById('analysisResult').innerHTML='';
+  document.getElementById('analysisBtn').disabled=true;
+  const prompt=`InBody/ACCUNIQ 체성분. 38세 남성(177cm). 목표: ${activeGoalType}. 헬스장: ${sameGym||'미설정'}.
+데이터: ${JSON.stringify({린벌크시작:slim(bulk[0]??ib[0]),일월기준:janRec?slim(janRec):null,최신:slim(last),동일헬스장직전:sameGymPrev?slim(sameGymPrev):null,동일헬스장전월평균:pmAvg,동일헬스장최근7개:recent7.map(slim)})}
+JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_points":["린벌크시작 대비 핵심1","핵심2"]},"recent":{"body":"최근 흐름 2문장"},"advice":{"prev_month":"전월대비 1문장","since_jan":"1월이후 1문장","cheer":"따뜻한 격려 1문장"}}`;
   try {
     const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
     });
     const data=await res.json();
-    const text=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
-    const p=JSON.parse(text.replace(/```json|```/g,'').trim());
+    const rawText=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
+    if(!rawText) throw new Error('응답 없음');
+    let p; try{ p=JSON.parse(rawText.replace(/```json|```/g,'').trim()); } catch(e){ throw new Error('JSON 파싱 실패: '+rawText.slice(0,150)); }
     const rc=rel.score>=80?'#4ade80':rel.score>=60?'#fbbf24':'#f87171';
     const rb=rel.score>=80?'rgba(74,222,128,0.08)':rel.score>=60?'rgba(251,191,36,0.08)':'rgba(248,113,113,0.08)';
     const rbr=rel.score>=80?'rgba(74,222,128,0.4)':rel.score>=60?'rgba(251,191,36,0.4)':'rgba(248,113,113,0.4)';
@@ -1141,53 +1216,41 @@ JSON만: {"trend":{"grade":"good|caution|warn","title":"한줄요약","bulk_poin
       const s=v=>+v>0?`<span style="color:#f87171">+${v}</span>`:+v<0?`<span style="color:#4ade80">${v}</span>`:`<span style="color:#888">${v}</span>`;
       const sm=v=>+v>0?`<span style="color:#4ade80">+${v}</span>`:+v<0?`<span style="color:#f87171">${v}</span>`:`<span style="color:#888">${v}</span>`;
       const dm=last.muscle!=null&&pmAvg.muscle!=null?(last.muscle-pmAvg.muscle).toFixed(1):null;
-      pmHtml=`<table class="wk-table" style="margin-top:.65rem">
-        <thead><tr><th></th><th>${pmAvg.month}(${pmAvg.n}회)</th><th>현재</th><th>변화</th></tr></thead>
-        <tbody>
-          <tr><td>체중</td><td>${pmAvg.weight}kg</td><td>${last.weight}kg</td><td>${s((last.weight-pmAvg.weight).toFixed(1))}kg</td></tr>
-          ${dm!=null?`<tr><td>골격근</td><td>${pmAvg.muscle}kg</td><td>${last.muscle}kg</td><td>${sm(dm)}kg</td></tr>`:''}
-          <tr><td>체지방</td><td>${pmAvg.fat}kg</td><td>${last.fat}kg</td><td>${s((last.fat-pmAvg.fat).toFixed(1))}kg</td></tr>
-          <tr><td>지방률</td><td>${pmAvg.fatpct}%</td><td>${last.fatpct}%</td><td>${s((last.fatpct-pmAvg.fatpct).toFixed(1))}%p</td></tr>
-        </tbody></table>`;
+      pmHtml=`<table class="wk-table" style="margin-top:.65rem"><thead><tr><th></th><th>${pmAvg.month} 평균(${pmAvg.n}회)</th><th>현재</th><th>변화</th></tr></thead><tbody><tr><td>체중</td><td>${pmAvg.weight}kg</td><td>${last.weight}kg</td><td>${s((last.weight-pmAvg.weight).toFixed(1))}kg</td></tr>${dm!=null?`<tr><td>골격근</td><td>${pmAvg.muscle}kg</td><td>${last.muscle}kg</td><td>${sm(dm)}kg</td></tr>`:''}<tr><td>체지방</td><td>${pmAvg.fat}kg</td><td>${last.fat}kg</td><td>${s((last.fat-pmAvg.fat).toFixed(1))}kg</td></tr><tr><td>지방률</td><td>${pmAvg.fatpct}%</td><td>${last.fatpct}%</td><td>${s((last.fatpct-pmAvg.fatpct).toFixed(1))}%p</td></tr></tbody></table>`;
     }
-    const wkRows=week.map(r=>`<tr><td>${r.date}${r.gym?' · '+r.gym:''}</td><td>${r.weight}</td><td>${r.muscle??'-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td></tr>`).join('');
-    const badges=[];
-    if(curGym!=='all') badges.push(`<span class="a-badge info">${curGym}</span>`);
-    if(curGoal!=='all') badges.push(`<span class="a-badge info">${goalLabel(curGoal)}</span>`);
+    const wkRows=recent7.map(r=>`<tr><td>${r.date}</td><td>${r.weight}</td><td>${r.muscle??'-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td></tr>`).join('');
+    const badges=[sameGym?`<span class="a-badge info">${sameGym}</span>`:null,curGoal!=='all'?`<span class="a-badge info">${goalLabel(curGoal)}</span>`:null].filter(Boolean);
     const badgeStr=badges.length?`<span style="margin-left:auto;display:flex;gap:4px">${badges.join('')}</span>`:'';
     document.getElementById('analysisResult').innerHTML=`
       <div class="a-card" style="border-color:${rbr};background:${rb}">
-        <div class="a-title">🎯 측정 신뢰도 <span class="a-badge" style="background:${rb};color:${rc};border:1px solid ${rbr}">${rl}</span><span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:${rc};margin-left:auto">${rel.score}%</span></div>
+        <div class="a-title">🎯 측정 신뢰도${sameGymPrev?` — ${sameGym} 직전(${sameGymPrev.date}) 기준`:''}
+          <span class="a-badge" style="background:${rb};color:${rc};border:1px solid ${rbr}">${rl}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:${rc};margin-left:auto">${rel.score}%</span>
+        </div>
         <ul style="padding-left:1rem;margin:0;display:flex;flex-direction:column;gap:3px">${rel.reasons.map(r=>`<li style="font-size:12px;color:var(--text2)">${r}</li>`).join('')}</ul>
-        ${rel.score<75?'<p style="font-size:11px;color:#fbbf24;margin-top:.4rem">⚠ 신뢰도 낮음 — 단독 판단 기준으로 삼지 마세요</p>':''}
+        ${rel.score<75?'<p style="font-size:11px;color:#fbbf24;margin-top:.4rem">⚠ 신뢰도 낮음</p>':''}
       </div>
-      <div class="a-card ${gm[p.trend.grade]||'info'}">
-        <div class="a-title">📈 추세 — <span class="a-badge ${gm[p.trend.grade]}">${p.trend.title}</span>${badgeStr}</div>
-        <ul style="padding-left:1rem;margin:0 0 .5rem;display:flex;flex-direction:column;gap:3px">${(p.trend.bulk_points||[]).map(x=>`<li style="font-size:13px">${x}</li>`).join('')}</ul>
-        ${pmAvg?`<ul style="padding-left:1rem;margin:0;display:flex;flex-direction:column;gap:3px">${(p.trend.prev_points||[]).map(x=>`<li style="font-size:12px;color:var(--text2)">${x}</li>`).join('')}</ul>`:''}
+      <div class="a-card ${gm[p.trend?.grade]||'info'}">
+        <div class="a-title">📈 추세 ${badgeStr}</div>
+        <div class="a-badge ${gm[p.trend?.grade]||'info'}" style="margin-bottom:.5rem;display:inline-block">${p.trend?.title||''}</div>
+        <ul style="padding-left:1rem;margin:0 0 .5rem;display:flex;flex-direction:column;gap:3px">${(p.trend?.bulk_points||[]).map(x=>`<li style="font-size:13px">${x}</li>`).join('')}</ul>
         ${pmHtml}
       </div>
       <div class="a-card info">
-        <div class="a-title">📅 최근 7일</div>
-        <div class="a-body" style="margin-bottom:.5rem;font-size:13px">${p.week.body}</div>
+        <div class="a-title">📋 ${sameGym||'동일 헬스장'} 최근 ${recent7.length}개 기록</div>
+        <div class="a-body" style="margin-bottom:.5rem;font-size:13px">${p.recent?.body||''}</div>
         <table class="wk-table"><thead><tr><th>날짜</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th></tr></thead><tbody>${wkRows}</tbody></table>
       </div>
-      <div class="a-card ${gm[p.warning.grade]||'info'}">
-        <div class="a-title">⚠️ 체지방 신호 <span class="a-badge ${gm[p.warning.grade]}">${p.warning.badge}</span></div>
-        <div class="a-body">${p.warning.body}</div>
-      </div>
-      <div class="a-card ${goalCfg.weight||goalCfg.muscle?'caution':'info'}">
-        <div class="a-title">🏆 목표(${goalLabel(activeGoalType)}) 대비 현황</div>
-        <div class="a-body">${p.goal_gap?.body||'목표 수치를 설정하면 더 정확한 분석이 가능합니다.'}</div>
-      </div>
-      <div class="a-card info">
+      <div class="a-card good">
         <div class="a-title">💡 조언</div>
-        <div class="a-body">${p.advice.body}</div>
+        <div class="a-body" style="display:flex;flex-direction:column;gap:6px">
+          ${p.advice?.prev_month?`<span style="font-size:12px;color:var(--text2)">전월 대비 — ${p.advice.prev_month}</span>`:''}
+          ${p.advice?.since_jan?`<span style="font-size:12px;color:var(--text2)">1월 이후 — ${p.advice.since_jan}</span>`:''}
+          ${p.advice?.cheer?`<span style="font-size:13px;color:var(--green);margin-top:4px">💬 ${p.advice.cheer}</span>`:''}
+        </div>
       </div>`;
     document.getElementById('analysisStatus').className='status';
-  } catch(e) {
-    showStatus('analysisStatus','error','분석 실패: ' + e.message);
-  }
+  } catch(e){ showStatus('analysisStatus','error','분석 실패: '+e.message); }
   document.getElementById('analysisBtn').disabled=false;
 }
 </script>
