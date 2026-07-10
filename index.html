@@ -136,6 +136,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <button class="tab-btn" data-tab="analysis">분석</button>
     <button class="tab-btn" data-tab="chart">차트</button>
     <button class="tab-btn" data-tab="history">기록</button>
+    <button class="tab-btn" data-tab="workout">운동로그</button>
   </div>
 
   <!-- UPLOAD -->
@@ -324,6 +325,68 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </table>
     </div>
   </div>
+
+  <div class="panel" id="panel-workout">
+    <!-- 입력 카드 -->
+    <div class="card">
+      <div class="card-label" id="woFormLabel">운동 기록 추가</div>
+      <div id="woStatus" class="status"></div>
+      <div class="grid3">
+        <div class="field"><label>날짜</label><input id="wo-date" type="text" placeholder="26.07.10"></div>
+        <div class="field"><label>헬스장</label><input id="wo-gym" type="text" list="gymList" autocomplete="off"></div>
+        <div class="field"><label>부위(선택)</label>
+          <select id="wo-cat"><option value="">— 부위 —</option></select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:.5rem">
+        <label>종목 (버튼 탭하거나 직접 입력)</label>
+        <input id="wo-exercise" type="text" list="exerciseList" autocomplete="off" placeholder="예: 시티드 레그컬">
+      </div>
+      <div id="woPresetRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem"></div>
+
+      <div class="grid3">
+        <div class="field"><label>무게 (kg)</label><input id="wo-weight" type="number" step="0.5" inputmode="decimal"></div>
+        <div class="field"><label>횟수</label><input id="wo-reps" type="number" step="1" inputmode="numeric"></div>
+        <div class="field"><label>세트</label><input id="wo-sets" type="number" step="1" inputmode="numeric" value="3"></div>
+      </div>
+
+      <div style="margin-bottom:.6rem">
+        <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="wo-setmode" style="width:auto"> 세트별로 따로 기록
+        </label>
+      </div>
+      <div id="woSetDetail" style="display:none;margin-bottom:.75rem">
+        <div id="woSetRows"></div>
+        <button class="btn btn-secondary" id="woAddSetBtn" style="font-size:12px;margin-top:6px">＋ 세트 추가</button>
+      </div>
+
+      <div class="field" style="margin-bottom:.75rem">
+        <label>메모 (선택)</label><input id="wo-memo" type="text" placeholder="예: 마지막 세트 힘들었음">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="woSaveBtn">기록 저장</button>
+        <button class="btn btn-secondary" id="woResetBtn" style="display:none">취소</button>
+      </div>
+    </div>
+
+    <!-- 종목별 추세 -->
+    <div class="card">
+      <div class="card-label">종목별 중량 추세 (점진적 과부하)</div>
+      <div class="field" style="max-width:260px;margin-bottom:.75rem">
+        <label>종목 선택</label>
+        <select id="woTrendSelect"><option value="">— 종목 —</option></select>
+      </div>
+      <div id="woTrendSummary"></div>
+      <div class="chart-wrap" style="height:180px"><canvas id="woTrendChart"></canvas></div>
+    </div>
+
+    <!-- 로그 목록 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:1rem 0 .6rem;flex-wrap:wrap;gap:8px">
+      <span id="woCount" style="font-size:13px;color:var(--text2)"></span>
+      <button class="btn btn-danger" id="woClearBtn" style="font-size:12px">전체삭제</button>
+    </div>
+    <div id="woLog"></div>
+  </div>
 </div>
 
 <div class="modal-bg" id="editModal">
@@ -369,6 +432,15 @@ const OFFSET_KEY    = 'body-comp-offsets';
 const REF_GYM_KEY   = 'body-comp-ref-gym';
 const TREND_KEY     = 'body-comp-trend-range';
 const API_KEY_S     = 'gemini-api-key';
+const WORKOUT_KEY   = 'body-comp-workouts';
+const EX_PRESETS    = {
+  '하체':['시티드 레그컬','라잉 레그컬','레그 익스텐션','힙쓰러스트','인아웃타이','카프레이즈','핵스쿼트','V스쿼트','레그프레스','스쿼트'],
+  '등':['체스트서포티드로우','시티드케이블로우','머신로우','원암덤벨로우','랫풀다운','풀업'],
+  '가슴':['벤치프레스','인클라인프레스','디클라인프레스','체스트프레스','펙덱플라이','딥스'],
+  '어깨':['숄더프레스','사이드레터럴레이즈','리어델트','페이스풀'],
+  '팔':['바벨컬','덤벨컬','해머컬','삼두푸시다운','오버헤드익스텐션'],
+  '기타':['플랭크','크런치','유산소']
+};
 const BULK_START    = '26.01.01';
 const GOAL_TYPES    = ['컷팅','린벌크','더티벌크','눈바디개선'];
 const DEFAULT_GYMS  = ['바이젝','휘트니스엠 마포','휘트니스엠 선릉','더블에스휘트니스','에이블짐 위례'];
@@ -384,6 +456,10 @@ let editIdx       = -1;
 let selectedImages = [];
 let muscleChart   = null;
 let fatChart      = null;
+let workouts      = [];
+let woEditIdx     = -1;
+let woSetRows     = [];
+let woTrendChart  = null;
 
 // ── Load & Migrate ─────────────────────────────────────
 (function init() {
@@ -391,6 +467,7 @@ let fatChart      = null;
   try { gyms    = JSON.parse(localStorage.getItem(GYM_KEY) || '[]'); } catch(e) { gyms = []; }
   try { goalCfg = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'); } catch(e) { goalCfg = {}; }
   try { offsets = JSON.parse(localStorage.getItem(OFFSET_KEY) || '{}'); } catch(e) { offsets = {}; }
+  try { workouts = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch(e) { workouts = []; }
   goalCfg = Object.assign({type:'',weight:null,muscle:null,fat:null,fatpct:null}, goalCfg);
 
   // Default offsets
@@ -428,6 +505,7 @@ function saveRec()     { localStorage.setItem(REC_KEY,    JSON.stringify(records
 function saveGyms()    { localStorage.setItem(GYM_KEY,    JSON.stringify(gyms)); }
 function saveGoal()    { localStorage.setItem(GOAL_KEY,   JSON.stringify(goalCfg)); }
 function saveOffsets() { localStorage.setItem(OFFSET_KEY, JSON.stringify(offsets)); }
+function saveWorkouts(){ localStorage.setItem(WORKOUT_KEY, JSON.stringify(workouts)); }
 function saveTrend()   { localStorage.setItem(TREND_KEY,  JSON.stringify({start:trendStart,end:trendEnd})); }
 function getApiKey()   { return localStorage.getItem(API_KEY_S)||''; }
 
@@ -553,6 +631,25 @@ function bindAll(){
   document.getElementById('cancelEditBtn').addEventListener('click', closeEdit);
   document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
   document.getElementById('editModal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeEdit(); });
+
+  // Workout log
+  const woCat=document.getElementById('wo-cat');
+  woCat.innerHTML='<option value="">— 부위 —</option>'+Object.keys(EX_PRESETS).map(c=>`<option value="${c}">${c}</option>`).join('');
+  woCat.addEventListener('change',renderPresetRow);
+  document.getElementById('wo-exercise').addEventListener('input',()=>{ /* free text allowed */ });
+  document.getElementById('wo-setmode').addEventListener('change',e=>{
+    const on=e.target.checked;
+    document.getElementById('woSetDetail').style.display=on?'block':'none';
+    document.getElementById('wo-weight').closest('.grid3').style.opacity=on?'.4':'1';
+    if(on&&woSetRows.length===0){ woSetRows=[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]; renderWoSetRows(); }
+  });
+  document.getElementById('woAddSetBtn').addEventListener('click',()=>{ woSetRows.push({weight:'',reps:''}); renderWoSetRows(); });
+  document.getElementById('woSaveBtn').addEventListener('click', saveWorkout);
+  document.getElementById('woResetBtn').addEventListener('click', resetWoForm);
+  document.getElementById('woTrendSelect').addEventListener('change', renderWoTrend);
+  document.getElementById('woClearBtn').addEventListener('click',()=>{
+    if(confirm('운동 기록 전체를 삭제할까요?')){ workouts=[]; saveWorkouts(); renderWorkouts(); }
+  });
 }
 
 // ── Tab Switch ─────────────────────────────────────────
@@ -565,6 +662,7 @@ function switchTab(id, btn){
   if(id==='analysis'){ renderMonthlyTrend(); }
   if(id==='chart')   { renderCharts(); }
   if(id==='history') { renderHistory(); }
+  if(id==='workout') { if(!document.getElementById('wo-date').value){ document.getElementById('wo-date').value=todayStr(); } renderWorkouts(); }
 }
 
 // ── Gym / Goal Toggles ─────────────────────────────────
@@ -1126,6 +1224,213 @@ function calcRel(last,prev){
   if(!reasons.length) reasons.push('직전 대비 정상 범위');
   return{score:Math.max(0,Math.min(100,score)),reasons};
 }
+
+// ── Workout Log ────────────────────────────────────────
+function renderPresetRow(){
+  const cat=document.getElementById('wo-cat').value;
+  const row=document.getElementById('woPresetRow');
+  if(!cat){ row.innerHTML=''; return; }
+  row.innerHTML=EX_PRESETS[cat].map(ex=>`<button type="button" class="g-btn wo-preset" data-ex="${ex}">${ex}</button>`).join('');
+  row.querySelectorAll('.wo-preset').forEach(b=>b.addEventListener('click',()=>{
+    document.getElementById('wo-exercise').value=b.dataset.ex;
+  }));
+}
+
+function renderWoSetRows(){
+  const wrap=document.getElementById('woSetRows');
+  wrap.innerHTML=woSetRows.map((s,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--text3);width:38px">${i+1}세트</span>
+      <input type="number" step="0.5" inputmode="decimal" placeholder="kg" value="${s.weight}" data-i="${i}" data-f="weight" class="wo-set-in" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;width:100%">
+      <span style="font-size:11px;color:var(--text3)">×</span>
+      <input type="number" step="1" inputmode="numeric" placeholder="회" value="${s.reps}" data-i="${i}" data-f="reps" class="wo-set-in" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;width:100%">
+      <button type="button" class="icon-btn wo-set-del" data-i="${i}">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.wo-set-in').forEach(inp=>inp.addEventListener('input',e=>{
+    woSetRows[+e.target.dataset.i][e.target.dataset.f]=e.target.value;
+  }));
+  wrap.querySelectorAll('.wo-set-del').forEach(b=>b.addEventListener('click',()=>{
+    woSetRows.splice(+b.dataset.i,1); renderWoSetRows();
+  }));
+}
+
+function saveWorkout(){
+  const date=document.getElementById('wo-date').value.trim()||todayStr();
+  const exercise=document.getElementById('wo-exercise').value.trim();
+  const gym=document.getElementById('wo-gym').value.trim();
+  const cat=document.getElementById('wo-cat').value;
+  const memo=document.getElementById('wo-memo').value.trim();
+  const setMode=document.getElementById('wo-setmode').checked;
+  if(!exercise){ woMsg('error','종목을 입력해줘'); return; }
+
+  let rec={date,exercise,gym,cat,memo};
+  if(setMode){
+    const dets=woSetRows.map(s=>({weight:parseFloat(s.weight)||0,reps:parseInt(s.reps)||0})).filter(s=>s.weight>0||s.reps>0);
+    if(!dets.length){ woMsg('error','세트 정보를 입력해줘'); return; }
+    rec.setDetails=dets;
+    rec.sets=dets.length;
+    rec.weight=Math.max(...dets.map(s=>s.weight));   // 대표=탑세트 무게
+    rec.reps=dets.find(s=>s.weight===rec.weight).reps;
+  }else{
+    const weight=parseFloat(document.getElementById('wo-weight').value)||0;
+    const reps=parseInt(document.getElementById('wo-reps').value)||0;
+    const sets=parseInt(document.getElementById('wo-sets').value)||0;
+    if(!weight&&!reps){ woMsg('error','무게나 횟수를 입력해줘'); return; }
+    rec.weight=weight; rec.reps=reps; rec.sets=sets; rec.setDetails=null;
+  }
+
+  if(woEditIdx>=0){ workouts[woEditIdx]=rec; woEditIdx=-1; }
+  else { workouts.push(rec); }
+  if(gym&&!gyms.includes(gym)){ gyms.push(gym); saveGyms(); }
+  saveWorkouts();
+  woMsg('success','저장 완료');
+  const keepDate=date, keepGym=gym;
+  resetWoForm();
+  document.getElementById('wo-date').value=keepDate;
+  document.getElementById('wo-gym').value=keepGym;
+  renderWorkouts();
+  setTimeout(()=>{ const el=document.getElementById('woStatus'); if(el) el.className='status'; },1800);
+}
+
+function resetWoForm(){
+  woEditIdx=-1; woSetRows=[];
+  ['wo-exercise','wo-weight','wo-reps','wo-memo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('wo-sets').value='3';
+  document.getElementById('wo-cat').value='';
+  document.getElementById('wo-setmode').checked=false;
+  document.getElementById('woSetDetail').style.display='none';
+  document.getElementById('wo-weight').closest('.grid3').style.opacity='1';
+  document.getElementById('woPresetRow').innerHTML='';
+  document.getElementById('woFormLabel').textContent='운동 기록 추가';
+  document.getElementById('woSaveBtn').textContent='기록 저장';
+  document.getElementById('woResetBtn').style.display='none';
+}
+
+function editWorkout(idx){
+  const r=workouts[idx]; if(!r) return;
+  woEditIdx=idx;
+  document.getElementById('wo-date').value=r.date;
+  document.getElementById('wo-gym').value=r.gym||'';
+  document.getElementById('wo-cat').value=r.cat||'';
+  document.getElementById('wo-exercise').value=r.exercise;
+  document.getElementById('wo-memo').value=r.memo||'';
+  renderPresetRow();
+  if(r.setDetails&&r.setDetails.length){
+    document.getElementById('wo-setmode').checked=true;
+    document.getElementById('woSetDetail').style.display='block';
+    document.getElementById('wo-weight').closest('.grid3').style.opacity='.4';
+    woSetRows=r.setDetails.map(s=>({weight:s.weight,reps:s.reps})); renderWoSetRows();
+  }else{
+    document.getElementById('wo-setmode').checked=false;
+    document.getElementById('woSetDetail').style.display='none';
+    document.getElementById('wo-weight').closest('.grid3').style.opacity='1';
+    document.getElementById('wo-weight').value=r.weight||'';
+    document.getElementById('wo-reps').value=r.reps||'';
+    document.getElementById('wo-sets').value=r.sets||'';
+  }
+  document.getElementById('woFormLabel').textContent='운동 기록 수정';
+  document.getElementById('woSaveBtn').textContent='수정 저장';
+  document.getElementById('woResetBtn').style.display='inline-block';
+  document.getElementById('panel-workout').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function deleteWorkout(idx){
+  if(!confirm('이 기록을 삭제할까?')) return;
+  workouts.splice(idx,1); saveWorkouts(); renderWorkouts();
+}
+
+function woSetSummary(r){
+  if(r.setDetails&&r.setDetails.length){
+    return r.setDetails.map(s=>`${s.weight||0}×${s.reps||0}`).join(' / ');
+  }
+  const parts=[];
+  if(r.weight) parts.push(`${r.weight}kg`);
+  if(r.reps) parts.push(`${r.reps}회`);
+  if(r.sets) parts.push(`${r.sets}세트`);
+  return parts.join(' × ');
+}
+
+function renderWorkouts(){
+  // exercise datalist
+  const exNames=[...new Set(workouts.map(w=>w.exercise))].sort();
+  const allEx=[...new Set([...Object.values(EX_PRESETS).flat(),...exNames])];
+  document.getElementById('exerciseList')?.remove();
+  const dl=document.createElement('datalist'); dl.id='exerciseList';
+  dl.innerHTML=allEx.map(e=>`<option value="${e}">`).join('');
+  document.body.appendChild(dl);
+
+  // trend select
+  const sel=document.getElementById('woTrendSelect');
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— 종목 —</option>'+exNames.map(e=>`<option value="${e}">${e}</option>`).join('');
+  if(exNames.includes(prev)) sel.value=prev;
+  renderWoTrend();
+
+  // count
+  const days=new Set(workouts.map(w=>w.date)).size;
+  document.getElementById('woCount').textContent=workouts.length?`${workouts.length}개 기록 · ${days}일`:'';
+
+  // log grouped by date
+  const box=document.getElementById('woLog');
+  if(!workouts.length){ box.innerHTML='<div class="empty">아직 운동 기록이 없어.<br>위에서 종목·무게·횟수 입력하고 저장해봐.</div>'; return; }
+  const byDate={};
+  workouts.forEach((w,i)=>{ (byDate[w.date]=byDate[w.date]||[]).push({w,i}); });
+  const dates=Object.keys(byDate).sort().reverse();
+  box.innerHTML=dates.map(d=>{
+    const rows=byDate[d].map(({w,i})=>`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500">${w.exercise}${w.cat?` <span class="tag tag-ac">${w.cat}</span>`:''}</div>
+          <div style="font-size:12px;color:var(--text2);font-family:'DM Mono',monospace;margin-top:2px">${woSetSummary(w)}</div>
+          ${w.memo?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${w.memo}</div>`:''}
+        </div>
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          <button class="icon-btn edit" onclick="editWorkout(${i})">✎</button>
+          <button class="icon-btn" onclick="deleteWorkout(${i})">🗑</button>
+        </div>
+      </div>`).join('');
+    return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:500">${d}</span><span style="font-size:11px;color:var(--text3)">${byDate[d][0].w.gym||''}</span></div>${rows}</div>`;
+  }).join('');
+}
+
+function renderWoTrend(){
+  const ex=document.getElementById('woTrendSelect').value;
+  const sum=document.getElementById('woTrendSummary');
+  if(woTrendChart){ woTrendChart.destroy(); woTrendChart=null; }
+  if(!ex){ sum.innerHTML='<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem">종목을 고르면 중량 추세를 보여줘.</p>'; return; }
+  const data=workouts.filter(w=>w.exercise===ex).sort((a,b)=>a.date<b.date?-1:1);
+  if(!data.length){ sum.innerHTML=''; return; }
+  const last=data[data.length-1], prev=data.length>1?data[data.length-2]:null;
+  let delta='';
+  if(prev){
+    const dw=(last.weight||0)-(prev.weight||0);
+    const dr=(last.reps||0)-(prev.reps||0);
+    let msg,cls;
+    if(dw>0){ msg=`지난번 대비 +${dw}kg ↑`; cls='good'; }
+    else if(dw<0){ msg=`지난번 대비 ${dw}kg ↓`; cls='caution'; }
+    else if(dr>0){ msg=`무게 동일, 횟수 +${dr}회 ↑`; cls='good'; }
+    else if(dr<0){ msg=`무게 동일, 횟수 ${dr}회 ↓`; cls='caution'; }
+    else { msg='지난번과 동일 — 과부하 필요'; cls='info'; }
+    delta=`<div class="a-card ${cls}" style="margin-bottom:.5rem"><div style="font-size:13px">${msg}</div></div>`;
+  }
+  sum.innerHTML=`${delta}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">최근: <b style="color:var(--text)">${last.weight||0}kg × ${last.reps||0}회</b> (${last.date}) · 총 ${data.length}회 기록</div>`;
+
+  const ctx=document.getElementById('woTrendChart');
+  woTrendChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:data.map(d=>d.date.slice(3)),datasets:[{
+      label:'무게(kg)',data:data.map(d=>d.weight||0),
+      borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,0.1)',
+      borderWidth:2,pointRadius:3,pointBackgroundColor:'#4ade80',tension:.3,fill:true
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:c=>{const d=data[c.dataIndex];return `${d.reps||0}회 × ${d.sets||0}세트`;}}}},
+      scales:{y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#888',font:{size:10}}},
+              x:{grid:{display:false},ticks:{color:'#888',font:{size:10}}}}}
+  });
+}
+
+function woMsg(type,msg){ const el=document.getElementById('woStatus'); el.className='status '+type; el.textContent=msg; }
 </script>
 </body>
 </html>
