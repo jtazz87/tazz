@@ -377,8 +377,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <select id="woTrendSelect"><option value="">— 종목 —</option></select>
       </div>
       <div id="woMetricRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem">
-        <button type="button" class="g-btn wo-metric active" data-m="volume">총 볼륨</button>
-        <button type="button" class="g-btn wo-metric" data-m="e1rm">e1RM</button>
+        <button type="button" class="g-btn wo-metric active" data-m="e1rm">e1RM (핵심)</button>
+        <button type="button" class="g-btn wo-metric" data-m="volume">총 볼륨</button>
         <button type="button" class="g-btn wo-metric" data-m="top">탑세트 중량</button>
       </div>
       <div id="woTrendSummary"></div>
@@ -465,7 +465,7 @@ let workouts      = [];
 let woEditIdx     = -1;
 let woSetRows     = [];
 let woTrendChart  = null;
-let woMetric      = 'volume';   // volume | e1rm | top
+let woMetric      = 'e1rm';     // e1rm | volume | top
 
 // ── Load & Migrate ─────────────────────────────────────
 (function init() {
@@ -1456,6 +1456,54 @@ function woSessions(ex){
 }
 
 const woNum=n=>Math.round(n).toLocaleString();
+const woD=s=>{const p=s.split('.');return new Date(2000+parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));};
+const woDays=(a,b)=>Math.round((woD(b)-woD(a))/86400000);
+
+// ── 4주 과부하 진단 (e1RM 3세션 이동평균 기준) ──────────
+function woDiagnose(S,bw){
+  const key  = bw?'totalReps':'e1rm';
+  const unit = bw?'회':'kg';
+  const name = bw?'총 횟수':'e1RM';
+  const ma   = a=>a.reduce((x,s)=>x+s[key],0)/a.length;
+  const last = S[S.length-1];
+  const span = woDays(S[0].date,last.date);
+
+  // 마지막 세션 기준 28일 이전 구간의 최근 3세션 = 베이스라인
+  const cutoff=new Date(woD(last.date)); cutoff.setDate(cutoff.getDate()-28);
+  const older=S.filter(s=>woD(s.date)<=cutoff);
+
+  if(S.length<3||older.length<2){
+    let extra='';
+    if(S.length>=2){
+      const p=woPct(last[key],S[0][key]);
+      extra=`지금까지 첫 기록 대비 <b style="color:var(--text)">${woSign(p)}</b> (${woNum(S[0][key])} → ${woNum(last[key])}${unit})`;
+    }
+    const left=Math.max(0,28-span);
+    return {cls:'info',icon:'⏳',verdict:'아직 판정 불가',
+      line:`기록 ${span}일치 · ${S.length}세션. 4주 판정에는 세션 3회 이상 + 4주 간격이 필요해${left?` (약 ${left}일 더)`:''}.`,
+      sub:extra, action:'그때까지는 같은 무게에서 횟수를 하나씩 늘리는 데만 집중하면 돼.'};
+  }
+
+  const cur=ma(S.slice(-3)), base=ma(older.slice(-3));
+  const pct=woPct(cur,base);
+  const gap=woDays(older[older.length-1].date,last.date);
+  let cls,icon,verdict,action;
+  if(pct>=5){        cls='good';    icon='📈'; verdict='과부하 잘 되고 있음';
+    action='지금 방식 그대로 유지. 목표 렙 범위 상단을 모든 세트에서 찍으면 무게를 올려.'; }
+  else if(pct>=2){   cls='good';    icon='🙂'; verdict='진행 중 (느린 편)';
+    action='방향은 맞아. 매 세트 마지막 1~2회를 힘들게 끝내고 있는지 확인해봐 — 여유가 남으면 그만큼 자극이 부족한 거야.'; }
+  else if(pct>-2){   cls='info';    icon='⏸'; verdict='정체';
+    action='4주째 제자리야. 무게나 횟수 중 하나를 강제로 올려. 세트 수만 늘리는 건 해결책이 아냐.'; }
+  else if(pct>-8){   cls='caution'; icon='📉'; verdict='하락';
+    action='훈련보다 회복 쪽 문제일 확률이 높아. 수면 시간과 섭취 칼로리부터 확인해봐.'; }
+  else {             cls='warn';    icon='⚠️'; verdict='큰 폭 하락';
+    action='과훈련이나 컨디션 문제 신호야. 1주 디로드(무게 60~70%로 낮춰 수행)를 고려해봐.'; }
+
+  return {cls,icon,verdict,pct,
+    line:`${name} 3세션 평균이 <b style="color:var(--text)">${gap}일 전보다 ${woSign(pct)}</b> (${woNum(base)} → ${woNum(cur)}${unit})`,
+    sub:'', action};
+}
+
 const woPct=(a,b)=>b>0?((a-b)/b*100):0;
 const woSign=v=>(v>0?'+':'')+v.toFixed(1)+'%';
 
@@ -1488,6 +1536,18 @@ function renderWoTrend(){
   const recent=past.slice(-N);
   const avg=recent.length?recent.reduce((a,b)=>a+b,0)/recent.length:null;
 
+  // ── 4주 과부하 진단 (최상단) ──
+  const dg=woDiagnose(S,bw);
+  const diagCard=`<div class="a-card ${dg.cls}" style="margin-bottom:.6rem">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+        <span style="font-size:15px">${dg.icon}</span>
+        <span style="font-size:14px;font-weight:600">${dg.verdict}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.55">${dg.line}</div>
+      ${dg.sub?`<div style="font-size:12px;color:var(--text2);line-height:1.55">${dg.sub}</div>`:''}
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.55;padding-top:6px;border-top:1px solid var(--border)">→ ${dg.action}</div>
+    </div>`;
+
   let cards='';
   if(past.length){
     const dAvg=woPct(cur,avg), dBest=woPct(cur,prevBest);
@@ -1508,7 +1568,7 @@ function renderWoTrend(){
   const detail = bw
     ? `${L.totalReps}회 / ${L.sets}세트`
     : `탑세트 ${L.top}kg × ${L.topReps}회 · 볼륨 ${woNum(L.volume)}kg · e1RM ${L.e1rm.toFixed(1)}kg`;
-  sum.innerHTML=`${cards}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
+  sum.innerHTML=`${diagCard}${cards}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
     최근 세션 <b style="color:var(--text)">${L.date}</b> — <span style="font-family:'DM Mono',monospace">${detail}</span> · 총 ${S.length}세션</div>`;
 
   // ── 차트: 지표 + 3회 이동평균 + 최고기록 기준선 ──
