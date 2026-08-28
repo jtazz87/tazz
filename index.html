@@ -371,13 +371,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     <!-- 종목별 추세 -->
     <div class="card">
-      <div class="card-label">종목별 중량 추세 (점진적 과부하)</div>
-      <div class="field" style="max-width:260px;margin-bottom:.75rem">
-        <label>종목 선택</label>
+      <div class="card-label">점진적 과부하 추세</div>
+      <div class="field" style="max-width:260px;margin-bottom:.6rem">
+        <label>종목 선택 <span style="color:var(--text3);font-weight:400">(위 입력과 자동 연동)</span></label>
         <select id="woTrendSelect"><option value="">— 종목 —</option></select>
       </div>
+      <div id="woMetricRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem">
+        <button type="button" class="g-btn wo-metric active" data-m="volume">총 볼륨</button>
+        <button type="button" class="g-btn wo-metric" data-m="e1rm">e1RM</button>
+        <button type="button" class="g-btn wo-metric" data-m="top">탑세트 중량</button>
+      </div>
       <div id="woTrendSummary"></div>
-      <div class="chart-wrap" style="height:180px"><canvas id="woTrendChart"></canvas></div>
+      <div class="chart-wrap" style="height:230px"><canvas id="woTrendChart"></canvas></div>
     </div>
 
     <!-- 로그 목록 -->
@@ -460,6 +465,7 @@ let workouts      = [];
 let woEditIdx     = -1;
 let woSetRows     = [];
 let woTrendChart  = null;
+let woMetric      = 'volume';   // volume | e1rm | top
 
 // ── Load & Migrate ─────────────────────────────────────
 (function init() {
@@ -636,7 +642,14 @@ function bindAll(){
   const woCat=document.getElementById('wo-cat');
   woCat.innerHTML='<option value="">— 부위 —</option>'+Object.keys(EX_PRESETS).map(c=>`<option value="${c}">${c}</option>`).join('');
   woCat.addEventListener('change',renderPresetRow);
-  document.getElementById('wo-exercise').addEventListener('input',()=>{ /* free text allowed */ });
+  const woExIn=document.getElementById('wo-exercise');
+  woExIn.addEventListener('input',()=>syncTrendToInput());
+  woExIn.addEventListener('change',()=>syncTrendToInput());
+  document.querySelectorAll('.wo-metric').forEach(b=>b.addEventListener('click',()=>{
+    woMetric=b.dataset.m;
+    document.querySelectorAll('.wo-metric').forEach(x=>x.classList.toggle('active',x===b));
+    renderWoTrend();
+  }));
   document.getElementById('wo-setmode').addEventListener('change',e=>{
     const on=e.target.checked;
     document.getElementById('woSetDetail').style.display=on?'block':'none';
@@ -1233,7 +1246,23 @@ function renderPresetRow(){
   row.innerHTML=EX_PRESETS[cat].map(ex=>`<button type="button" class="g-btn wo-preset" data-ex="${ex}">${ex}</button>`).join('');
   row.querySelectorAll('.wo-preset').forEach(b=>b.addEventListener('click',()=>{
     document.getElementById('wo-exercise').value=b.dataset.ex;
+    syncTrendToInput();
   }));
+}
+
+// 운동로그 종목 입력 → 점진적 과부하 탭 자동 선택
+function syncTrendToInput(){
+  const ex=document.getElementById('wo-exercise').value.trim();
+  const sel=document.getElementById('woTrendSelect');
+  if(!ex||!sel) return;
+  // 타이핑 중간값이 목록에 쌓이지 않게, 완성된 종목명일 때만 동기화
+  const known = workouts.some(w=>w.exercise===ex) || Object.values(EX_PRESETS).flat().includes(ex);
+  if(!known) return;
+  if(![...sel.options].some(o=>o.value===ex)){
+    const o=document.createElement('option');
+    o.value=ex; o.textContent=ex; sel.appendChild(o);
+  }
+  if(sel.value!==ex){ sel.value=ex; renderWoTrend(); }
 }
 
 function renderWoSetRows(){
@@ -1315,6 +1344,7 @@ function editWorkout(idx){
   document.getElementById('wo-exercise').value=r.exercise;
   document.getElementById('wo-memo').value=r.memo||'';
   renderPresetRow();
+  syncTrendToInput();
   if(r.setDetails&&r.setDetails.length){
     document.getElementById('wo-setmode').checked=true;
     document.getElementById('woSetDetail').style.display='block';
@@ -1361,9 +1391,11 @@ function renderWorkouts(){
 
   // trend select
   const sel=document.getElementById('woTrendSelect');
+  const typed=document.getElementById('wo-exercise').value.trim();
   const prev=sel.value;
   sel.innerHTML='<option value="">— 종목 —</option>'+exNames.map(e=>`<option value="${e}">${e}</option>`).join('');
-  if(exNames.includes(prev)) sel.value=prev;
+  if(typed&&exNames.includes(typed))      sel.value=typed;   // 입력창 종목 우선
+  else if(exNames.includes(prev))          sel.value=prev;
   renderWoTrend();
 
   // count
@@ -1393,40 +1425,126 @@ function renderWorkouts(){
   }).join('');
 }
 
+// ── 점진적 과부하 계산 ─────────────────────────────────
+// 기록 1건 → 볼륨 / 탑세트 / e1RM
+function woMetrics(w){
+  if(w.setDetails&&w.setDetails.length){
+    let vol=0,top=0,topReps=0,e1=0,reps=0;
+    w.setDetails.forEach(s=>{
+      const wt=parseFloat(s.weight)||0, rp=parseInt(s.reps)||0;
+      vol+=wt*rp; reps+=rp;
+      if(wt>top){ top=wt; topReps=rp; }
+      const est=wt*(1+rp/30); if(est>e1) e1=est;
+    });
+    return {volume:vol,top,topReps,e1rm:e1,sets:w.setDetails.length,reps};
+  }
+  const wt=parseFloat(w.weight)||0, rp=parseInt(w.reps)||0, st=parseInt(w.sets)||0;
+  return {volume:wt*rp*st,top:wt,topReps:rp,e1rm:wt*(1+rp/30),sets:st,reps:rp*st};
+}
+
+// 같은 날짜의 같은 종목 기록은 1세션으로 합산
+function woSessions(ex){
+  const by={};
+  workouts.filter(w=>w.exercise===ex).forEach(w=>{
+    const m=woMetrics(w);
+    const s=by[w.date]||(by[w.date]={date:w.date,volume:0,totalReps:0,sets:0,top:0,topReps:0,e1rm:0});
+    s.volume+=m.volume; s.totalReps+=m.reps; s.sets+=m.sets;
+    if(m.top>s.top){ s.top=m.top; s.topReps=m.topReps; }
+    if(m.e1rm>s.e1rm) s.e1rm=m.e1rm;
+  });
+  return Object.values(by).sort((a,b)=>a.date<b.date?-1:1);
+}
+
+const woNum=n=>Math.round(n).toLocaleString();
+const woPct=(a,b)=>b>0?((a-b)/b*100):0;
+const woSign=v=>(v>0?'+':'')+v.toFixed(1)+'%';
+
 function renderWoTrend(){
   const ex=document.getElementById('woTrendSelect').value;
   const sum=document.getElementById('woTrendSummary');
   if(woTrendChart){ woTrendChart.destroy(); woTrendChart=null; }
-  if(!ex){ sum.innerHTML='<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem">종목을 고르면 중량 추세를 보여줘.</p>'; return; }
-  const data=workouts.filter(w=>w.exercise===ex).sort((a,b)=>a.date<b.date?-1:1);
-  if(!data.length){ sum.innerHTML=''; return; }
-  const last=data[data.length-1], prev=data.length>1?data[data.length-2]:null;
-  let delta='';
-  if(prev){
-    const dw=(last.weight||0)-(prev.weight||0);
-    const dr=(last.reps||0)-(prev.reps||0);
-    let msg,cls;
-    if(dw>0){ msg=`지난번 대비 +${dw}kg ↑`; cls='good'; }
-    else if(dw<0){ msg=`지난번 대비 ${dw}kg ↓`; cls='caution'; }
-    else if(dr>0){ msg=`무게 동일, 횟수 +${dr}회 ↑`; cls='good'; }
-    else if(dr<0){ msg=`무게 동일, 횟수 ${dr}회 ↓`; cls='caution'; }
-    else { msg='지난번과 동일 — 과부하 필요'; cls='info'; }
-    delta=`<div class="a-card ${cls}" style="margin-bottom:.5rem"><div style="font-size:13px">${msg}</div></div>`;
-  }
-  sum.innerHTML=`${delta}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">최근: <b style="color:var(--text)">${last.weight||0}kg × ${last.reps||0}회</b> (${last.date}) · 총 ${data.length}회 기록</div>`;
+  if(!ex){ sum.innerHTML='<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem">종목을 고르면 과부하 추세를 보여줘.</p>'; return; }
 
+  const S=woSessions(ex);
+  if(!S.length){ sum.innerHTML=`<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem"><b style="color:var(--text2)">${ex}</b> — 아직 기록이 없어.</p>`; return; }
+
+  // 맨몸/유산소 종목: 중량이 전부 0이면 볼륨을 총 횟수로 대체
+  const bw = S.every(s=>s.top===0);
+  let key,unit,label;
+  if(woMetric==='volume'){ key=bw?'totalReps':'volume'; unit=bw?'회':'kg'; label=bw?'총 횟수':'총 볼륨'; }
+  else if(woMetric==='e1rm'){ key='e1rm'; unit='kg'; label='e1RM'; }
+  else { key='top'; unit='kg'; label='탑세트 중량'; }
+  if(bw&&woMetric!=='volume'){ key='totalReps'; unit='회'; label='총 횟수'; }
+
+  const vals=S.map(s=>s[key]);
+  const cur=vals[vals.length-1];
+
+  // ① 역대 최고(직전까지) 대비  ② 최근 N회 평균 대비
+  const past=vals.slice(0,-1);
+  const best=vals.reduce((a,b)=>Math.max(a,b),0);
+  const bestIdx=vals.lastIndexOf(best);
+  const prevBest=past.length?Math.max(...past):null;
+  const N=Math.min(5,past.length);
+  const recent=past.slice(-N);
+  const avg=recent.length?recent.reduce((a,b)=>a+b,0)/recent.length:null;
+
+  let cards='';
+  if(past.length){
+    const dAvg=woPct(cur,avg), dBest=woPct(cur,prevBest);
+    const isPR = cur>prevBest;
+    let msg,cls;
+    if(isPR){ msg=`${label} 신기록 — 직전 최고 대비 ${woSign(dBest)}`; cls='good'; }
+    else if(dAvg>=3){ msg=`최근 ${N}회 평균 대비 ${woSign(dAvg)} — 상승 추세`; cls='good'; }
+    else if(dAvg>-3){ msg=`최근 ${N}회 평균 대비 ${woSign(dAvg)} — 정체, 과부하 필요`; cls='info'; }
+    else if(dAvg>=-10){ msg=`최근 ${N}회 평균 대비 ${woSign(dAvg)} — 하락`; cls='caution'; }
+    else { msg=`최근 ${N}회 평균 대비 ${woSign(dAvg)} — 큰 폭 하락 (컨디션·부상 체크)`; cls='warn'; }
+    cards=`<div class="a-card ${cls}" style="margin-bottom:.5rem;padding:.7rem .9rem"><div style="font-size:13px">${msg}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">
+        오늘 ${woNum(cur)}${unit} · 최근 ${N}회 평균 ${woNum(avg)}${unit} · 역대 최고 ${woNum(prevBest)}${unit} (${S[vals.lastIndexOf(prevBest)].date})
+      </div></div>`;
+  }
+
+  const L=S[S.length-1];
+  const detail = bw
+    ? `${L.totalReps}회 / ${L.sets}세트`
+    : `탑세트 ${L.top}kg × ${L.topReps}회 · 볼륨 ${woNum(L.volume)}kg · e1RM ${L.e1rm.toFixed(1)}kg`;
+  sum.innerHTML=`${cards}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
+    최근 세션 <b style="color:var(--text)">${L.date}</b> — <span style="font-family:'DM Mono',monospace">${detail}</span> · 총 ${S.length}세션</div>`;
+
+  // ── 차트: 지표 + 3회 이동평균 + 최고기록 기준선 ──
+  const mv=vals.map((_,i)=>{ const w=vals.slice(Math.max(0,i-2),i+1); return w.reduce((a,b)=>a+b,0)/w.length; });
   const ctx=document.getElementById('woTrendChart');
   woTrendChart=new Chart(ctx,{
     type:'line',
-    data:{labels:data.map(d=>d.date.slice(3)),datasets:[{
-      label:'무게(kg)',data:data.map(d=>d.weight||0),
-      borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,0.1)',
-      borderWidth:2,pointRadius:3,pointBackgroundColor:'#4ade80',tension:.3,fill:true
-    }]},
+    data:{
+      labels:S.map(s=>s.date.slice(3).replace('.','/')),
+      datasets:[
+        { label:label, data:vals, borderColor:'#4ade80', backgroundColor:'rgba(74,222,128,0.10)',
+          borderWidth:2, tension:.25, fill:true, order:1,
+          pointRadius:c=>c.dataIndex===bestIdx?5:3,
+          pointBackgroundColor:c=>c.dataIndex===bestIdx?'#fbbf24':'#4ade80',
+          pointBorderColor:c=>c.dataIndex===bestIdx?'#fbbf24':'#4ade80' },
+        { label:'3회 이동평균', data:mv, borderColor:'#60a5fa', borderWidth:1.5,
+          borderDash:[5,4], pointRadius:0, tension:.35, fill:false, order:2 },
+        { label:'역대 최고', data:vals.map(()=>best), borderColor:'rgba(251,191,36,0.45)',
+          borderWidth:1, borderDash:[2,4], pointRadius:0, fill:false, order:3 }
+      ]
+    },
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:c=>{const d=data[c.dataIndex];return `${d.reps||0}회 × ${d.sets||0}세트`;}}}},
-      scales:{y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#888',font:{size:10}}},
-              x:{grid:{display:false},ticks:{color:'#888',font:{size:10}}}}}
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:true,position:'bottom',labels:{color:'#888',boxWidth:10,boxHeight:2,font:{size:10},padding:10,usePointStyle:false}},
+        tooltip:{callbacks:{
+          title:c=>S[c[0].dataIndex].date,
+          label:c=>c.datasetIndex===0?`${label} ${woNum(c.parsed.y)}${unit}`:`${c.dataset.label} ${woNum(c.parsed.y)}${unit}`,
+          afterBody:c=>{ const d=S[c[0].dataIndex];
+            return bw?[`${d.totalReps}회 / ${d.sets}세트`]:[`탑세트 ${d.top}kg × ${d.topReps}회 / ${d.sets}세트`]; }
+        }}
+      },
+      scales:{
+        y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#888',font:{size:10},callback:v=>woNum(v)}},
+        x:{grid:{display:false},ticks:{color:'#888',font:{size:10},autoSkip:true,maxTicksLimit:6,maxRotation:0,minRotation:0}}
+      }}
   });
 }
 
