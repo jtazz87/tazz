@@ -1117,6 +1117,53 @@ function saveEdit(){
 }
 
 // ── Analysis ───────────────────────────────────────────
+// ── 전월→당월 체성분 판정 (규칙 기반, AI 아님) ────────
+function assessComposition(pm,cm,goal){
+  if(!pm||!cm) return null;
+  const n=v=>v==null?null:+v;
+  const dW=n(cm.weight)!=null&&n(pm.weight)!=null?+(cm.weight-pm.weight).toFixed(2):null;
+  const dM=n(cm.muscle)!=null&&n(pm.muscle)!=null?+(cm.muscle-pm.muscle).toFixed(2):null;
+  const dF=n(cm.fat)!=null&&n(pm.fat)!=null?+(cm.fat-pm.fat).toFixed(2):null;
+  const dP=n(cm.fatpct)!=null&&n(pm.fatpct)!=null?+(cm.fatpct-pm.fatpct).toFixed(2):null;
+  if(dM==null||dF==null) return null;
+
+  const facts=[];
+  // 증가분 구성비
+  let share=null, ratio=null;
+  if(dM>0&&dF>0){ share=dM/(dM+dF)*100; ratio=dM/dF;
+    facts.push(`증가분 구성: 근육 ${share.toFixed(0)}% / 지방 ${(100-share).toFixed(0)}% (근육:지방 = 1:${(1/ratio).toFixed(1)})`); }
+  if(dP!=null&&dP!==0) facts.push(`지방률 ${dP>0?'+':''}${dP}%p/월 — 이 속도면 3개월 뒤 ${(cm.fatpct+dP*3).toFixed(1)}%`);
+  if(cm.weight&&dW!=null) facts.push(`체중 변화율 ${(dW/pm.weight*100).toFixed(1)}%/월 (린벌크 권장 +0.5~1.5%/월)`);
+
+  let grade,verdict,action;
+  if(goal==='컷팅'){
+    if(dF<-0.2&&dM>=-0.2){ grade='good'; verdict='컷팅 정상 진행 — 지방 위주 감량';
+      action='현재 칼로리·단백질 유지.'; }
+    else if(dF<0&&dM<-0.3){ grade='caution'; verdict='감량 중이나 근손실 동반';
+      action='적자 폭을 줄이고 단백질을 체중 1kg당 2g 이상으로 올려.'; }
+    else if(dF>=0){ grade='warn'; verdict='지방이 안 빠지고 있음';
+      action='섭취 칼로리 재측정 필요 — 기록 누락 가능성부터 확인해.'; }
+    else { grade='caution'; verdict='변화 미미'; action='적자 폭을 소폭 늘려봐.'; }
+  } else if(goal==='더티벌크'){
+    grade=dM>0?'good':'caution';
+    verdict=dM>0?`근육 +${dM}kg — 증량 진행 중`:'체중은 느는데 근육 증가 없음';
+    action=dM>0?'목표 달성 후 컷팅 시점을 미리 정해둬.':'훈련 강도를 먼저 점검해. 칼로리 문제가 아냐.';
+  } else { // 린벌크 / 눈바디개선 / 기타
+    if(dM<=0&&dF>0){ grade='warn'; verdict='근육 정체·감소 + 지방만 증가 — 린벌크 실패 구간';
+      action='잉여 칼로리를 줄이고, 그 전에 훈련 볼륨·강도부터 점검해.'; }
+    else if(dF<=0&&dM>0){ grade='good'; verdict='근육 증가 + 지방 유지·감소 — 최상';
+      action='지금 칼로리·훈련 그대로 유지.'; }
+    else if(ratio>=1){ grade='good'; verdict='근육이 지방보다 많이 늘었음 — 린벌크 정상';
+      action='현재 설정 유지.'; }
+    else if(ratio>=0.5){ grade='caution'; verdict='근육은 늘지만 지방이 더 빠르게 붙는 중 — 약간 과속';
+      action='잉여 칼로리를 하루 100~150kcal 줄여봐.'; }
+    else { grade='warn'; verdict='지방 증가가 근육 증가를 크게 앞섬 — 린벌크가 아니라 과잉 증량';
+      action='잉여 칼로리를 하루 200~300kcal 줄이고 4주 뒤 재판정. 훈련은 그대로.'; }
+  }
+  if(dP!=null&&dP>=0.8&&grade==='good') grade='caution';
+  return {grade,verdict,action,facts,dW,dM,dF,dP,share,ratio};
+}
+
 async function runAnalysis(){
   const key=getApiKey(); if(!key){showStatus('analysisStatus','error','Gemini API 키가 필요합니다.');return;}
   const filtered=getFiltered(); // already sorted, filtered by curGym+curGoal
@@ -1149,9 +1196,20 @@ async function runAnalysis(){
   document.getElementById('analysisResult').innerHTML='';
   document.getElementById('analysisBtn').disabled=true;
 
-  const prompt=`체성분 분석. 38세남성 177cm. 목표:${activeGoal}. 필터:${filterLabel}.
-${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평균:pmAvg,최근5:recent7.slice(-5).map(slim)})}
-JSON만: {"trend":{"grade":"good|caution|warn","title":"요약","points":["핵심1","핵심2"]},"recent":{"body":"흐름2문장"},"advice":{"prev":"전월vs당월비교1문장","cheer":"격려1문장"}}`;
+  const asmt=assessComposition(pmAvg,cmAvg,activeGoal);
+  const asmtTxt=asmt?`\n[확정 판정 — 규칙 기반으로 이미 계산됨. 이 판정을 뒤집거나 완화하지 말 것]\n등급:${asmt.grade} / ${asmt.verdict}\n근거:${asmt.facts.join(' · ')}`:'';
+
+  const prompt=`체성분 데이터 분석. 38세 남성 177cm. 목표:${activeGoal}. 필터:${filterLabel}.
+${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평균:pmAvg,최근5:recent7.slice(-5).map(slim)})}${asmtTxt}
+
+[작성 규칙 — 반드시 준수]
+1. 격려·응원·위로·미화 금지. "좋은 흐름", "잘하고 있다" 같은 표현은 데이터가 실제로 그럴 때만.
+2. 나쁜 신호는 나쁘다고 명시할 것. 좋은 점과 나쁜 점을 억지로 균형 맞추지 말 것.
+3. 숫자 근거 없는 문장 금지. 모든 주장에 실제 수치를 붙일 것.
+4. 골격근 ±0.3kg, 체지방률 ±0.5%p 이내 변화는 측정 노이즈 가능성을 명시할 것.
+5. grade는 위 확정 판정 값을 그대로 사용.
+
+JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","points":["수치근거 핵심1","수치근거 핵심2"]},"recent":{"body":"흐름2문장"},"advice":{"prev":"전월vs당월 사실비교 1문장","action":"지금 조정할 것 1문장"}}`;
 
   try{
     const models=['gemini-2.5-flash-lite','gemini-2.5-flash'];
@@ -1198,6 +1256,12 @@ JSON만: {"trend":{"grade":"good|caution|warn","title":"요약","points":["핵�
         <ul style="padding-left:1rem;margin:0;display:flex;flex-direction:column;gap:3px">${rel.reasons.map(r=>`<li style="font-size:12px;color:var(--text2)">${r}</li>`).join('')}</ul>
         ${rel.score<75?'<p style="font-size:11px;color:#fbbf24;margin-top:.4rem">⚠ 신뢰도 낮음 — 단독 판단 기준으로 삼지 마세요</p>':''}
       </div>
+      ${asmt?`<div class="a-card ${asmt.grade}">
+        <div class="a-title">⚖️ 전월 대비 판정<span class="a-badge ${asmt.grade}" style="margin-left:auto">${asmt.grade==='good'?'양호':asmt.grade==='caution'?'주의':'경고'}</span></div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:.45rem">${asmt.verdict}</div>
+        <ul style="padding-left:1rem;margin:0 0 .5rem;display:flex;flex-direction:column;gap:3px">${asmt.facts.map(f=>`<li style="font-size:12px;color:var(--text2)">${f}</li>`).join('')}</ul>
+        <div style="font-size:11px;color:var(--text3);padding-top:6px;border-top:1px solid var(--border)">→ ${asmt.action}</div>
+      </div>`:''}
       <div class="a-card ${gm[p.trend?.grade]||'info'}">
         <div class="a-title">📈 추세<span style="margin-left:auto;font-size:10px;color:var(--text3)">${filterLabel}${curGoal!=='all'?' · '+goalLabel(curGoal):''}</span></div>
         <div class="a-badge ${gm[p.trend?.grade]||'info'}" style="margin-bottom:.5rem;display:inline-block">${p.trend?.title||''}</div>
@@ -1209,11 +1273,11 @@ JSON만: {"trend":{"grade":"good|caution|warn","title":"요약","points":["핵�
         <div class="a-body" style="margin-bottom:.5rem;font-size:13px">${p.recent?.body||''}</div>
         <table class="wk-table"><thead><tr><th>날짜</th><th>체중</th><th>근육</th><th>지방</th><th>지방률</th></tr></thead><tbody>${wkRows}</tbody></table>
       </div>
-      <div class="a-card good">
+      <div class="a-card ${asmt?asmt.grade:'info'}">
         <div class="a-title">💡 조언</div>
         <div class="a-body" style="display:flex;flex-direction:column;gap:6px">
           ${p.advice?.prev?`<span style="font-size:12px;color:var(--text2)">전월 대비 — ${p.advice.prev}</span>`:''}
-          ${p.advice?.cheer?`<span style="font-size:13px;color:var(--green);margin-top:4px">💬 ${p.advice.cheer}</span>`:''}
+          ${p.advice?.action?`<span style="font-size:13px;margin-top:4px">▶ ${p.advice.action}</span>`:''}
         </div>
       </div>`;
     document.getElementById('analysisStatus').className='status';
