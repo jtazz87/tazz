@@ -494,7 +494,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-d';
+const APP_VERSION='2026.08.31-e';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -537,7 +537,7 @@ let woTrendChart  = null;
 let woMetric      = 'e1rm';     // e1rm | volume | top
 
 // ── Load & Migrate ─────────────────────────────────────
-(function init() {
+function init() {
   try { records = JSON.parse(localStorage.getItem(REC_KEY) || '[]'); } catch(e) { records = []; }
   try { gyms    = JSON.parse(localStorage.getItem(GYM_KEY) || '[]'); } catch(e) { gyms = []; }
   try { goalCfg = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'); } catch(e) { goalCfg = {}; }
@@ -573,7 +573,9 @@ let woMetric      = 'e1rm';     // e1rm | volume | top
   renderGoalCard();
   renderOffsetTable();
   renderAll();
-})();
+}
+// init() 호출은 스크립트 맨 끝에서 한다.
+// 뒤쪽에 선언된 const(MINICUT, woDays 등)가 초기화된 뒤에 실행되어야 함.
 
 // ── Persist ────────────────────────────────────────────
 function saveRec()     { localStorage.setItem(REC_KEY,    JSON.stringify(records)); }
@@ -2107,6 +2109,13 @@ function showErr(where,e){
 }
 window.addEventListener('error',ev=>showErr('스크립트',ev.error||ev.message));
 window.addEventListener('unhandledrejection',ev=>showErr('비동기',ev.reason));
+
+// ── 앱 시작 (모든 선언이 끝난 뒤 실행) ──────────────────
+try{
+  init();
+}catch(e){
+  window.__showEarlyErr('초기화(init)', e.message, e.stack);
+}
 </script>
 </body>
 </html>
