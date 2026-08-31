@@ -7,14 +7,15 @@
  * 캐시 버전을 올리면 이전 캐시는 activate 시 전부 삭제됨.
  */
 
-const VERSION    = 'tazz-v1';
+const VERSION    = 'tazz-v3';
 const SHELL      = VERSION + '-shell';
 const ASSETS     = VERSION + '-assets';
-const NET_TIMEOUT = 3000;
+const NET_TIMEOUT = 8000;   // 너무 짧으면 옛 캐시로 넘어가버림
 
+// index.html은 설치 시점에 캐시하지 않는다.
+// 설치 스냅샷이 이후 배포한 최신 파일을 계속 가리는 문제가 있었음.
+// 네트워크에서 성공적으로 받아온 뒤에만 캐시에 넣는다.
 const SHELL_URLS = [
-  './',
-  './index.html',
   './manifest.json'
 ];
 

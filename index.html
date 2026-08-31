@@ -136,7 +136,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <datalist id="badReasonList"><option value="폭식 후 3일 내"><option value="감기·몸살"><option value="음주 다음날"><option value="기타"></datalist>
 <div class="app">
   <h1>체성분 트래커</h1>
-  <p class="sub">스크린샷 업로드 → AI 자동 추출 → 누적 저장</p>
+  <p class="sub">스크린샷 업로드 → AI 자동 추출 → 누적 저장
+    <span id="appVer" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:var(--bg3);color:var(--text3);font-family:'DM Mono',monospace;font-size:10px"></span>
+  </p>
+  <div id="errBanner"></div>
   <div id="swBanner"></div>
   <div id="backupBanner"></div>
   <div id="triggerBanner"></div>
@@ -1476,8 +1479,16 @@ async function runAnalysis(){
   document.getElementById('analysisResult').innerHTML='';
   document.getElementById('analysisBtn').disabled=true;
 
-  const asmt=assessComposition(pmAvg,cmAvg,activeGoal);
-  const nrg=estimateEnergy(pmAvg,cmAvg,activeGoal,30);
+  let asmt=null,nrg=null;
+  try{
+    asmt=assessComposition(pmAvg,cmAvg,activeGoal);
+    nrg=estimateEnergy(pmAvg,cmAvg,activeGoal,30);
+  }catch(e){
+    showErr('판정 계산',e);
+    showStatus('analysisStatus','error','판정 계산 실패: '+e.message);
+    document.getElementById('analysisBtn').disabled=false;
+    return;
+  }
   const asmtTxt=asmt?`\n[확정 판정 — 규칙 기반으로 이미 계산됨. 이 판정을 뒤집거나 완화하지 말 것]\n등급:${asmt.grade} / ${asmt.verdict}\n근거:${asmt.facts.join(' · ')}`:'';
 
   const prompt=`체성분 데이터 분석. 38세 남성 177cm. 목표:${activeGoal}. 필터:${filterLabel}.
@@ -1499,7 +1510,15 @@ JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","poin
     const models=['gemini-2.5-flash-lite','gemini-2.5-flash'];
     let data,rawText='';
     for(const model of models){
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+      const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),60000);
+      let res;
+      try{
+        res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]}),signal:ac.signal});
+      }catch(err){
+        clearTimeout(to);
+        throw new Error(err.name==='AbortError'?'응답 60초 초과 — 네트워크 확인':'네트워크 오류: '+err.message);
+      }
+      clearTimeout(to);
       data=await res.json();
       rawText=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
       if(rawText) break;
@@ -1595,7 +1614,12 @@ JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","poin
         </div>
       </div>`;
     document.getElementById('analysisStatus').className='status';
-  }catch(e){showStatus('analysisStatus','error','분석 실패: '+e.message);}
+  }catch(e){
+    showErr('AI 분석',e);
+    showStatus('analysisStatus','error','분석 실패: '+e.message);
+  }finally{
+    document.getElementById('analysisBtn').disabled=false;
+  }
   document.getElementById('analysisBtn').disabled=false;
 }
 
@@ -1886,6 +1910,14 @@ const woPct=(a,b)=>b>0?((a-b)/b*100):0;
 const woSign=v=>(v>0?'+':'')+v.toFixed(1)+'%';
 
 function renderWoTrend(){
+  try{ renderWoTrendInner(); }
+  catch(e){
+    showErr('점진적 과부하 추세',e);
+    const s=document.getElementById('woTrendSummary');
+    if(s) s.innerHTML='<p style="font-size:12px;color:#f87171">추세 계산 중 오류 — 위 오류 배너 참고</p>';
+  }
+}
+function renderWoTrendInner(){
   const ex=document.getElementById('woTrendSelect').value;
   const sum=document.getElementById('woTrendSummary');
   if(woTrendChart){ woTrendChart.destroy(); woTrendChart=null; }
@@ -1952,6 +1984,10 @@ function renderWoTrend(){
   // ── 차트: 지표 + 3회 이동평균 + 최고기록 기준선 ──
   const mv=vals.map((_,i)=>{ const w=vals.slice(Math.max(0,i-2),i+1); return w.reduce((a,b)=>a+b,0)/w.length; });
   const ctx=document.getElementById('woTrendChart');
+  if(typeof Chart==='undefined'){ 
+    sum.innerHTML+='<p style="font-size:11px;color:#fbbf24;margin-top:.4rem">그래프 라이브러리(Chart.js)를 못 불러왔어 — 오프라인이거나 캐시 문제. 판정 수치는 위에 정상 표시됨.</p>';
+    return;
+  }
   woTrendChart=new Chart(ctx,{
     type:'line',
     data:{
@@ -2017,6 +2053,33 @@ function showSwBanner(worker){
     setTimeout(()=>location.reload(),300);
   };
 }
+
+// ── 오류 표시 (원인 추적용) ─────────────────────────────
+function showErr(where,e){
+  const el=document.getElementById('errBanner'); if(!el) return;
+  const msg=(e&&(e.message||e))+'';
+  const stack=(e&&e.stack||'').split('\n').slice(0,3).join('\n');
+  el.innerHTML=`<div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.5);border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem">
+    <div style="font-size:12.5px;color:#f87171;font-weight:600;margin-bottom:4px">⛔ 오류 발생 — ${where}</div>
+    <div style="font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;word-break:break-all;line-height:1.5">${msg}</div>
+    <details style="margin-top:6px"><summary style="font-size:10.5px;color:var(--text3);cursor:pointer">자세히</summary>
+      <pre style="font-size:9.5px;color:var(--text3);white-space:pre-wrap;margin:4px 0 0">${stack}</pre>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">Chart:${typeof Chart} · XLSX:${typeof XLSX} · 기록:${(typeof records!=='undefined'?records.length:'?')} · 운동:${(typeof workouts!=='undefined'?workouts.length:'?')}</div>
+    </details>
+    <button class="btn btn-secondary" style="font-size:10.5px;padding:4px 10px;margin-top:6px" onclick="document.getElementById('errBanner').innerHTML=''">닫기</button>
+  </div>`;
+  console.error(where,e);
+}
+window.addEventListener('error',ev=>showErr('스크립트',ev.error||ev.message));
+window.addEventListener('unhandledrejection',ev=>showErr('비동기',ev.reason));
+
+// ── 버전 표시 (어떤 코드가 돌고 있는지 확인용) ───────────
+const APP_VERSION='2026.08.31-c';
+(function(){
+  const el=document.getElementById('appVer');
+  if(el) el.textContent='v'+APP_VERSION;
+  console.log('체성분 트래커 '+APP_VERSION);
+})();
 </script>
 </body>
 </html>
