@@ -9,6 +9,28 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
+<script>
+// ── 최우선 오류 감지 (다른 어떤 코드보다 먼저 등록) ──────
+window.__APP_ERRORS=[];
+window.__showEarlyErr=function(where,msg,stack){
+  window.__APP_ERRORS.push({where,msg,stack});
+  var el=document.getElementById('errBanner');
+  if(!el){ document.addEventListener('DOMContentLoaded',function(){window.__showEarlyErr(where,msg,stack);}); return; }
+  el.innerHTML='<div style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.6);border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem">'
+    +'<div style="font-size:13px;color:#f87171;font-weight:700;margin-bottom:5px">\u26d4 \uc624\ub8e5 \u2014 '+where+'</div>'
+    +'<div style="font-size:11.5px;color:#e5e5e5;font-family:monospace;word-break:break-all;line-height:1.6">'+msg+'</div>'
+    +'<pre style="font-size:10px;color:#888;white-space:pre-wrap;margin:6px 0 0;max-height:160px;overflow:auto">'+(stack||'')+'</pre>'
+    +'</div>';
+};
+window.addEventListener('error',function(ev){
+  window.__showEarlyErr('스크립트 실행', (ev.error&&ev.error.message)||ev.message||'unknown',
+    (ev.error&&ev.error.stack)||((ev.filename||'')+' line '+(ev.lineno||'?')));
+});
+window.addEventListener('unhandledrejection',function(ev){
+  var r=ev.reason||{};
+  window.__showEarlyErr('비동기 처리', r.message||String(r), r.stack||'');
+});
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -472,6 +494,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
+const APP_VERSION='2026.08.31-d';
+try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
+console.log('체성분 트래커 '+APP_VERSION);
+
 const REC_KEY       = 'body-comp-records';
 const GYM_KEY       = 'body-comp-gyms';
 const GOAL_KEY      = 'body-comp-goal';
@@ -698,21 +724,29 @@ function bindAll(){
   const woCat=document.getElementById('wo-cat');
   woCat.innerHTML='<option value="">— 부위 —</option>'+Object.keys(EX_PRESETS).map(c=>`<option value="${c}">${c}</option>`).join('');
   woCat.addEventListener('change',renderPresetRow);
-  document.getElementById('f-bad').addEventListener('change',e=>{
-    document.getElementById('fBadReasonWrap').style.display=e.target.checked?'block':'none';
-  });
-  document.getElementById('e-bad').addEventListener('change',e=>{
-    document.getElementById('eBadReasonWrap').style.display=e.target.checked?'block':'none';
-  });
+  // 각 리스너를 격리 — 하나가 실패해도 나머지는 등록되도록
+  const wire=(name,fn)=>{ try{ fn(); }catch(e){ window.__showEarlyErr('리스너 등록: '+name, e.message, e.stack); } };
 
-  const woExIn=document.getElementById('wo-exercise');
-  woExIn.addEventListener('input',()=>syncTrendToInput());
-  woExIn.addEventListener('change',()=>syncTrendToInput());
-  document.querySelectorAll('.wo-metric').forEach(b=>b.addEventListener('click',()=>{
-    woMetric=b.dataset.m;
-    document.querySelectorAll('.wo-metric').forEach(x=>x.classList.toggle('active',x===b));
-    renderWoTrend();
-  }));
+  wire('오염 체크박스',()=>{
+    document.getElementById('f-bad').addEventListener('change',e=>{
+      document.getElementById('fBadReasonWrap').style.display=e.target.checked?'block':'none';
+    });
+    document.getElementById('e-bad').addEventListener('change',e=>{
+      document.getElementById('eBadReasonWrap').style.display=e.target.checked?'block':'none';
+    });
+  });
+  wire('종목 자동연동',()=>{
+    const woExIn=document.getElementById('wo-exercise');
+    woExIn.addEventListener('input',()=>syncTrendToInput());
+    woExIn.addEventListener('change',()=>syncTrendToInput());
+  });
+  wire('지표 토글',()=>{
+    document.querySelectorAll('.wo-metric').forEach(b=>b.addEventListener('click',()=>{
+      woMetric=b.dataset.m;
+      document.querySelectorAll('.wo-metric').forEach(x=>x.classList.toggle('active',x===b));
+      renderWoTrend();
+    }));
+  });
   document.getElementById('wo-setmode').addEventListener('change',e=>{
     const on=e.target.checked;
     document.getElementById('woSetDetail').style.display=on?'block':'none';
@@ -2056,6 +2090,7 @@ function showSwBanner(worker){
 
 // ── 오류 표시 (원인 추적용) ─────────────────────────────
 function showErr(where,e){
+  try{ window.__showEarlyErr(where,(e&&e.message)||String(e),(e&&e.stack)||''); }catch(_){}
   const el=document.getElementById('errBanner'); if(!el) return;
   const msg=(e&&(e.message||e))+'';
   const stack=(e&&e.stack||'').split('\n').slice(0,3).join('\n');
@@ -2072,14 +2107,6 @@ function showErr(where,e){
 }
 window.addEventListener('error',ev=>showErr('스크립트',ev.error||ev.message));
 window.addEventListener('unhandledrejection',ev=>showErr('비동기',ev.reason));
-
-// ── 버전 표시 (어떤 코드가 돌고 있는지 확인용) ───────────
-const APP_VERSION='2026.08.31-c';
-(function(){
-  const el=document.getElementById('appVer');
-  if(el) el.textContent='v'+APP_VERSION;
-  console.log('체성분 트래커 '+APP_VERSION);
-})();
 </script>
 </body>
 </html>
