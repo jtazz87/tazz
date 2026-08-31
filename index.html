@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>체성분 트래커</title>
+<meta name="theme-color" content="#0d0d0f">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -131,6 +136,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <div class="app">
   <h1>체성분 트래커</h1>
   <p class="sub">스크린샷 업로드 → AI 자동 추출 → 누적 저장</p>
+  <div id="swBanner"></div>
+  <div id="backupBanner"></div>
+  <div id="triggerBanner"></div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="upload">측정 추가</button>
     <button class="tab-btn" data-tab="analysis">분석</button>
@@ -160,6 +168,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div class="field"><label>목표 골격근(kg)</label><input id="g-muscle" type="number" step="0.1" placeholder="—"></div>
           <div class="field"><label>목표 체지방(kg)</label><input id="g-fat" type="number" step="0.1" placeholder="—"></div>
           <div class="field"><label>목표 지방률(%)</label><input id="g-fatpct" type="number" step="0.1" placeholder="—"></div>
+        </div>
+        <div class="field" style="margin-bottom:.5rem;max-width:220px">
+          <label>미니컷 트리거 지방률(%) <span style="color:var(--text3);font-weight:400">— 넘으면 경고</span></label>
+          <input id="g-fatcap" type="number" step="0.1" placeholder="예: 15.5">
         </div>
         <div id="goalProgress" class="goal-progress"></div>
         <div style="margin-top:.6rem;text-align:right">
@@ -438,6 +450,7 @@ const REF_GYM_KEY   = 'body-comp-ref-gym';
 const TREND_KEY     = 'body-comp-trend-range';
 const API_KEY_S     = 'gemini-api-key';
 const WORKOUT_KEY   = 'body-comp-workouts';
+const EXPORT_KEY    = 'body-comp-last-export';
 const EX_PRESETS    = {
   '하체':['시티드 레그컬','라잉 레그컬','레그 익스텐션','힙쓰러스트','인아웃타이','카프레이즈','핵스쿼트','V스쿼트','레그프레스','스쿼트'],
   '등':['체스트서포티드로우','시티드케이블로우','머신로우','원암덤벨로우','랫풀다운','풀업'],
@@ -474,7 +487,7 @@ let woMetric      = 'e1rm';     // e1rm | volume | top
   try { goalCfg = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'); } catch(e) { goalCfg = {}; }
   try { offsets = JSON.parse(localStorage.getItem(OFFSET_KEY) || '{}'); } catch(e) { offsets = {}; }
   try { workouts = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch(e) { workouts = []; }
-  goalCfg = Object.assign({type:'',weight:null,muscle:null,fat:null,fatpct:null}, goalCfg);
+  goalCfg = Object.assign({type:'',weight:null,muscle:null,fat:null,fatpct:null,fatcap:null,act:1.5}, goalCfg);
 
   // Default offsets
   const defOff = {'에이블짐 위례':{muscle:-0.20,fat:0},'더블에스휘트니스':{muscle:-0.35,fat:0},'바이젝':{muscle:0,fat:0},'휘트니스엠 선릉':{muscle:0,fat:0}};
@@ -584,7 +597,8 @@ function bindAll(){
     goalCfg.muscle=parseFloat(document.getElementById('g-muscle').value)||null;
     goalCfg.fat=parseFloat(document.getElementById('g-fat').value)||null;
     goalCfg.fatpct=parseFloat(document.getElementById('g-fatpct').value)||null;
-    saveGoal(); renderGoalProgress();
+    goalCfg.fatcap=parseFloat(document.getElementById('g-fatcap').value)||null;
+    saveGoal(); renderGoalProgress(); renderTriggerBanner();
     showStatus('goalSuggestStatus','success','목표 저장 완료');
     setTimeout(()=>{ const el=document.getElementById('goalSuggestStatus'); if(el) el.className='status'; },2000);
   });
@@ -732,7 +746,7 @@ function addGym(){
 }
 function removeGym(name){
   gyms=gyms.filter(g=>g!==name); if(curGym===name) curGym='all';
-  saveGyms(); renderToggles(); renderMonthlyTrend(); renderCharts(); renderHistory();
+  saveGyms(); renderToggles(); renderMonthlyTrend(); renderCharts(); renderHistory(); renderTriggerBanner();
 }
 
 // ── Offset Table ───────────────────────────────────────
@@ -863,6 +877,7 @@ function renderGoalCard(){
   document.getElementById('g-muscle').value=goalCfg.muscle??'';
   document.getElementById('g-fat').value=goalCfg.fat??'';
   document.getElementById('g-fatpct').value=goalCfg.fatpct??'';
+  document.getElementById('g-fatcap').value=goalCfg.fatcap??'';
   renderGoalProgress();
 }
 function renderGoalProgress(){
@@ -1048,6 +1063,34 @@ function exportXlsx(){
   const ws=XLSX.utils.json_to_sheet(sorted.map(r=>({'날짜':r.date,'체중':r.weight,'근육':r.muscle??'','지방량':r.fat,'지방률':r.fatpct,'기초대사량':r.bmr??'','체수분':r.water??'','기기':r.device,'헬스장':r.gym??'','목표':r.goal??''})));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
   XLSX.writeFile(wb,`체성분_${todayStr().replace(/\./g,'')}.xlsx`);
+  localStorage.setItem(EXPORT_KEY,new Date().toISOString());
+  renderBackupBanner();
+}
+
+// ── 백업 리마인더 ──────────────────────────────────────
+function renderBackupBanner(){
+  const el=document.getElementById('backupBanner'); if(!el) return;
+  if(!records.length){ el.innerHTML=''; return; }
+  const iso=localStorage.getItem(EXPORT_KEY);
+  const days=iso?Math.floor((Date.now()-new Date(iso))/86400000):null;
+  if(days!=null&&days<30){ el.innerHTML=''; return; }
+  const msg=days==null
+    ? `백업한 적이 없어. 기록 ${records.length}개가 이 브라우저에만 있어.`
+    : `마지막 백업 ${days}일 전. 그 뒤로 기록이 쌓였어.`;
+  el.innerHTML=`<div style="background:rgba(251,191,36,0.09);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:15px">💾</span>
+    <div style="flex:1;min-width:170px">
+      <div style="font-size:12.5px;color:var(--amber);font-weight:500">${msg}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">브라우저 데이터 삭제·기기 변경 시 복구 불가</div>
+    </div>
+    <button class="btn btn-secondary" id="bkNowBtn" style="font-size:11px;padding:5px 12px;white-space:nowrap">지금 백업</button>
+    <button class="btn btn-secondary" id="bkLaterBtn" style="font-size:11px;padding:5px 10px;white-space:nowrap;opacity:.6">7일 뒤</button>
+  </div>`;
+  document.getElementById('bkNowBtn').onclick=()=>exportXlsx();
+  document.getElementById('bkLaterBtn').onclick=()=>{
+    const d=new Date(); d.setDate(d.getDate()-23);
+    localStorage.setItem(EXPORT_KEY,d.toISOString()); renderBackupBanner();
+  };
 }
 
 // ── Render All ─────────────────────────────────────────
@@ -1056,6 +1099,8 @@ function renderAll(){
   renderGoalProgress();
   renderHistory();
   renderMonthlyTrend();
+  renderBackupBanner();
+  renderTriggerBanner();
 }
 
 // ── History ────────────────────────────────────────────
@@ -1117,6 +1162,71 @@ function saveEdit(){
 }
 
 // ── Analysis ───────────────────────────────────────────
+// ── TDEE / 칼로리 수지 역산 ───────────────────────────
+// 체중이 아니라 실제 조성 변화로 계산 (지방 7700kcal/kg, 제지방 1800kcal/kg)
+function estimateEnergy(pm,cm,goal,days){
+  if(!pm||!cm||cm.weight==null||cm.fat==null) return null;
+  const d=days||30;
+  const dF=(pm.fat!=null)?(cm.fat-pm.fat):null;
+  const dM=(pm.muscle!=null&&cm.muscle!=null)?(cm.muscle-pm.muscle):0;
+  if(dF==null) return null;
+
+  // 일일 수지 (+면 잉여)
+  const bal=(dF*7700+dM*1800)/d;
+  // Katch-McArdle: 제지방량 기반 BMR
+  const lbm=cm.weight-cm.fat;
+  const bmr=370+21.6*lbm;
+  const act=goalCfg.act||1.5;
+  const maint=bmr*act;
+  const intake=maint+bal;
+
+  // 목표 수지: 린벌크 +150 / 컷팅 -400 / 더티벌크 +400 / 그 외 0
+  const target=goal==='컷팅'?-400:goal==='더티벌크'?400:goal==='린벌크'?150:0;
+  const adjust=target-bal;
+  return {bal:Math.round(bal),bmr:Math.round(bmr),maint:Math.round(maint),
+          intake:Math.round(intake),target,adjust:Math.round(adjust),lbm:+lbm.toFixed(1),act};
+}
+
+// ── 미니컷 트리거 감지 ────────────────────────────────
+function checkFatCap(pm,cm){
+  const cap=goalCfg.fatcap;
+  if(!cap||!cm||cm.fatpct==null) return null;
+  const rate=(pm&&pm.fatpct!=null)?+(cm.fatpct-pm.fatpct).toFixed(2):null;
+  if(cm.fatpct>=cap) return {state:'over',cap,cur:cm.fatpct,rate};
+  if(rate!=null&&rate>0.05){
+    const m=(cap-cm.fatpct)/rate;
+    if(m<=3) return {state:'near',cap,cur:cm.fatpct,rate,months:+m.toFixed(1)};
+  }
+  return {state:'ok',cap,cur:cm.fatpct,rate};
+}
+
+function renderTriggerBanner(){
+  const el=document.getElementById('triggerBanner'); if(!el) return;
+  el.innerHTML='';
+  if(!goalCfg.fatcap||!records.length) return;
+  let data=[...records].map(applyOffset).sort((a,b)=>a.date.localeCompare(b.date));
+  if(curGym!=='all') data=data.filter(r=>(r.gym||'')===curGym);
+  if(!data.length) return;
+  const last=data[data.length-1];
+  const [yr,mo]=last.date.split('.').map(Number);
+  let pmo=mo-1,pyr=yr; if(pmo<1){pmo=12;pyr--;}
+  const cm=monthlyAvg(data,last.date.slice(0,5));
+  const pm=monthlyAvg(data,`${String(pyr).padStart(2,'0')}.${String(pmo).padStart(2,'0')}`);
+  const t=checkFatCap(pm,cm);
+  if(!t||t.state==='ok') return;
+  const over=t.state==='over';
+  const col=over?'#f87171':'#fbbf24';
+  const bg=over?'rgba(248,113,113,0.09)':'rgba(251,191,36,0.09)';
+  const title=over?`미니컷 트리거 도달 — 당월 평균 ${t.cur}% (기준 ${t.cap}%)`
+                  :`트리거 접근 중 — 현재 ${t.cur}%, 기준 ${t.cap}%`;
+  const sub=over?'벌크를 멈추고 컷팅 전환을 판단할 시점이야.'
+                :`현재 속도(+${t.rate}%p/월) 유지 시 약 ${t.months}개월 뒤 도달.`;
+  el.innerHTML=`<div style="background:${bg};border:1px solid ${col}66;border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem;display:flex;align-items:flex-start;gap:10px">
+    <span style="font-size:15px">${over?'🛑':'⚠️'}</span>
+    <div><div style="font-size:12.5px;color:${col};font-weight:500">${title}</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:2px">${sub}</div></div></div>`;
+}
+
 // ── 전월→당월 체성분 판정 (규칙 기반, AI 아님) ────────
 function assessComposition(pm,cm,goal){
   if(!pm||!cm) return null;
@@ -1197,11 +1307,12 @@ async function runAnalysis(){
   document.getElementById('analysisBtn').disabled=true;
 
   const asmt=assessComposition(pmAvg,cmAvg,activeGoal);
+  const nrg=estimateEnergy(pmAvg,cmAvg,activeGoal,30);
   const asmtTxt=asmt?`\n[확정 판정 — 규칙 기반으로 이미 계산됨. 이 판정을 뒤집거나 완화하지 말 것]\n등급:${asmt.grade} / ${asmt.verdict}\n근거:${asmt.facts.join(' · ')}`:'';
 
   const prompt=`체성분 데이터 분석. 38세 남성 177cm. 목표:${activeGoal}. 필터:${filterLabel}.
 측정 간격 불규칙 — 아래는 날짜가 아니라 '기록 ${recent7.length}개'다.
-${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평균:pmAvg,[`최근기록${recent7.length}개`]:recent7.map(slim)})}${asmtTxt}
+${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평균:pmAvg,[`최근기록${recent7.length}개`]:recent7.map(slim)})}${asmtTxt}${nrg?`\n[칼로리 역산] 추정 유지 ${nrg.maint}kcal / 추정 섭취 ${nrg.intake}kcal / 현재 수지 ${nrg.bal>0?'+':''}${nrg.bal}kcal / 권장 수지 ${nrg.target>0?'+':''}${nrg.target}kcal / 조정 필요 ${nrg.adjust>0?'+':''}${nrg.adjust}kcal`:''}
 
 [작성 규칙 — 반드시 준수]
 1. 격려·응원·위로·미화 금지. "좋은 흐름", "잘하고 있다" 같은 표현은 데이터가 실제로 그럴 때만.
@@ -1212,7 +1323,7 @@ ${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평
 6. 기록은 운동한 날에만 측정하므로 간격이 불규칙하다. "최근 5일간", "일주일간", "지난주" 같은 물리적 기간 표현 절대 금지. 반드시 "최근 ${recent7.length}개 기록", "최근 ${recent7.length}회 측정"처럼 횟수로 표현할 것.
 7. recent.body는 위 ${recent7.length}개 기록 전체를 근거로 쓸 것.
 
-JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","points":["수치근거 핵심1","수치근거 핵심2"]},"recent":{"body":"흐름2문장"},"advice":{"prev":"전월vs당월 사실비교 1문장","action":"지금 조정할 것 1문장"}}`;
+JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","points":["수치근거 핵심1","수치근거 핵심2"]},"recent":{"body":"흐름2문장"},"advice":{"prev":"전월vs당월 사실비교 1문장","action":"지금 조정할 것 1문장(칼로리 역산값이 있으면 구체적 kcal 포함)"}}`;
 
   try{
     const models=['gemini-2.5-flash-lite','gemini-2.5-flash'];
@@ -1275,6 +1386,25 @@ JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","poin
         <div style="font-size:13px;font-weight:500;margin-bottom:.45rem">${asmt.verdict}</div>
         <ul style="padding-left:1rem;margin:0 0 .5rem;display:flex;flex-direction:column;gap:3px">${asmt.facts.map(f=>`<li style="font-size:12px;color:var(--text2)">${f}</li>`).join('')}</ul>
         <div style="font-size:11px;color:var(--text3);padding-top:6px;border-top:1px solid var(--border)">→ ${asmt.action}</div>
+      </div>`:''}
+      ${nrg?`<div class="a-card info">
+        <div class="a-title">🔥 칼로리 수지 역산<span style="margin-left:auto;font-size:10px;color:var(--text3)">체성분 변화 기반 추정</span></div>
+        <table class="wk-table" style="margin-top:.2rem">
+          <tbody>
+            <tr><td>추정 유지 칼로리</td><td>${nrg.maint.toLocaleString()} kcal</td></tr>
+            <tr><td>추정 섭취량</td><td>${nrg.intake.toLocaleString()} kcal</td></tr>
+            <tr><td>현재 일일 수지</td><td style="color:${nrg.bal>0?'#f87171':nrg.bal<0?'#60a5fa':'#888'}">${nrg.bal>0?'+':''}${nrg.bal} kcal</td></tr>
+            <tr><td>${activeGoal} 권장 수지</td><td>${nrg.target>0?'+':''}${nrg.target} kcal</td></tr>
+          </tbody>
+        </table>
+        <div style="font-size:12px;margin-top:.5rem;padding-top:6px;border-top:1px solid var(--border)">
+          ${Math.abs(nrg.adjust)<80?'→ 현재 섭취량이 목표 범위 안이야. 유지해.'
+            :`→ 하루 <b style="color:${nrg.adjust<0?'#fbbf24':'#4ade80'}">${nrg.adjust>0?'+':''}${nrg.adjust} kcal</b> 조정 필요 (약 ${(Math.abs(nrg.adjust)/100).toFixed(1)}00kcal ${nrg.adjust<0?'감량':'증량'})`}
+        </div>
+        <div style="font-size:10.5px;color:var(--text3);margin-top:6px;line-height:1.5">
+          제지방 ${nrg.lbm}kg · Katch-McArdle BMR ${nrg.bmr.toLocaleString()} × 활동계수 ${nrg.act}<br>
+          섭취량은 실제 기록이 아닌 <b>체성분 변화 역산값</b>이야. ±200kcal 오차 감안하고 방향만 참고해.
+        </div>
       </div>`:''}
       <div class="a-card ${gm[p.trend?.grade]||'info'}">
         <div class="a-title">📈 추세<span style="margin-left:auto;font-size:10px;color:var(--text3)">${filterLabel}${curGoal!=='all'?' · '+goalLabel(curGoal):''}</span></div>
@@ -1687,6 +1817,36 @@ function renderWoTrend(){
 }
 
 function woMsg(type,msg){ const el=document.getElementById('woStatus'); el.className='status '+type; el.textContent=msg; }
+
+// ── Service Worker 등록 (오프라인 지원) ─────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      // 새 버전 감지 → 강제 새로고침 대신 배너로 알림
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller) showSwBanner(nw);
+        });
+      });
+      if(reg.waiting&&navigator.serviceWorker.controller) showSwBanner(reg.waiting);
+    }).catch(e=>console.warn('SW 등록 실패',e));
+  });
+}
+
+function showSwBanner(worker){
+  const el=document.getElementById('swBanner'); if(!el) return;
+  el.innerHTML=`<div style="background:rgba(96,165,250,0.09);border:1px solid rgba(96,165,250,0.4);border-radius:10px;padding:.65rem .85rem;margin-bottom:.75rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:14px">🔄</span>
+    <div style="flex:1;min-width:150px;font-size:12.5px;color:#60a5fa">새 버전이 준비됐어.</div>
+    <button class="btn btn-secondary" id="swApplyBtn" style="font-size:11px;padding:5px 12px;white-space:nowrap">적용</button>
+  </div>`;
+  document.getElementById('swApplyBtn').onclick=()=>{
+    worker.postMessage('skipWaiting');
+    setTimeout(()=>location.reload(),300);
+  };
+}
 </script>
 </body>
 </html>
