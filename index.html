@@ -378,6 +378,26 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   </div>
 
   <div class="panel" id="panel-workout">
+    <!-- 부위 추천 -->
+    <div class="card">
+      <div class="card-label">🎯 오늘 추천 부위</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.7rem;flex-wrap:wrap">
+        <span style="font-size:11.5px;color:var(--text3)">주 훈련 횟수</span>
+        <div id="woFreqRow" style="display:flex;gap:4px">
+          <button type="button" class="g-btn wo-freq" data-f="2" style="font-size:11px;padding:4px 10px">2회</button>
+          <button type="button" class="g-btn wo-freq" data-f="3" style="font-size:11px;padding:4px 10px">3회</button>
+          <button type="button" class="g-btn wo-freq active" data-f="4" style="font-size:11px;padding:4px 10px">4회</button>
+          <button type="button" class="g-btn wo-freq" data-f="5" style="font-size:11px;padding:4px 10px">5회</button>
+          <button type="button" class="g-btn wo-freq" data-f="6" style="font-size:11px;padding:4px 10px">6회</button>
+        </div>
+      </div>
+      <div id="woRecBody"></div>
+      <details style="margin-top:.7rem">
+        <summary style="font-size:11px;color:var(--text3);cursor:pointer">목표 가중치 · 제외 부위 설정</summary>
+        <div id="woWeightCfg" style="margin-top:.7rem"></div>
+      </details>
+    </div>
+
     <!-- 입력 카드 -->
     <div class="card">
       <div class="card-label" id="woFormLabel">운동 기록 추가</div>
@@ -522,7 +542,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-h';
+const APP_VERSION='2026.08.31-i';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -784,6 +804,11 @@ function bindAll(){
       if(e.target.files[0]) importWorkoutXlsx(e.target.files[0]);
       e.target.value='';
     });
+  });
+  wire('주 훈련 횟수',()=>{
+    document.querySelectorAll('.wo-freq').forEach(b=>b.addEventListener('click',()=>{
+      recCfg.freq=+b.dataset.f; saveRecCfg(recCfg); renderWoRec();
+    }));
   });
   wire('훈련 연차',()=>{
     document.getElementById('woIndexBody').addEventListener('click',e=>{
@@ -1905,6 +1930,7 @@ function renderWorkouts(){
   sel.innerHTML='<option value="">— 종목 —</option>'+exNames.map(e=>`<option value="${e}">${e}</option>`).join('');
   if(typed&&exNames.includes(typed))      sel.value=typed;   // 입력창 종목 우선
   else if(exNames.includes(prev))          sel.value=prev;
+  try{ renderWoRec(); }catch(e){ showErr('부위 추천',e); }
   try{ renderWoIndex(); }catch(e){ showErr('전체 과부하 지수',e); }
   renderWoTrend();
 
@@ -2112,6 +2138,182 @@ function importWorkoutXlsx(file){
     }catch(err){ showErr('운동기록 가져오기',err); showStatus('woXlsxStatus','error','읽기 실패: '+err.message); }
   };
   reader.readAsArrayBuffer(file);
+}
+
+
+// ══ 부위 추천 ════════════════════════════════════════════
+// 판정 단위는 "세트 수". 종목 수로 세면 3세트와 1세트가 같아지고,
+// 톤수로 세면 하체가 항상 이겨서 둘 다 왜곡이 생긴다.
+// 근비대 문헌 표준도 주당 세트 수(부위별 10~20세트)라 절대 기준과 비교도 된다.
+const PART_ORDER=['등','어깨','가슴','하체','팔','기타'];
+const DEFAULT_PART_W={'등':30,'어깨':25,'가슴':20,'하체':20,'팔':5,'기타':0};
+const REST_HOURS=48;              // 같은 부위 회복 간격
+const SETS_PER_PART_MIN=10;       // 주당 부위별 권장 하한
+const SETS_PER_PART_MAX=20;       // 상한
+
+function loadRecCfg(){
+  let c={};
+  try{ c=JSON.parse(localStorage.getItem('body-comp-part-cfg')||'{}'); }catch(e){}
+  return {
+    weights: Object.assign({}, DEFAULT_PART_W, c.weights||{}),
+    excluded: c.excluded||[],
+    freq: c.freq||4
+  };
+}
+function saveRecCfg(c){ localStorage.setItem('body-comp-part-cfg', JSON.stringify(c)); }
+let recCfg = loadRecCfg();
+
+// 부위별 최근 14일 세트 수 / 마지막 수행일
+function woPartStats(days){
+  const end=workouts.length?woD([...workouts].sort((a,b)=>b.date.localeCompare(a.date))[0].date):new Date();
+  const today=new Date();
+  const from=new Date(today); from.setDate(from.getDate()-days);
+  const st={}; PART_ORDER.forEach(p=>st[p]={sets:0,exCount:0,last:null,sessions:new Set()});
+  workouts.forEach(w=>{
+    const p=w.cat||woPartOf(w.exercise);
+    if(!st[p]) st[p]={sets:0,exCount:0,last:null,sessions:new Set()};
+    const d=woD(w.date);
+    if(!st[p].last||d>st[p].last) st[p].last=d;
+    if(d>=from){
+      st[p].sets += (w.setDetails?w.setDetails.length:(parseInt(w.sets)||0));
+      st[p].exCount++;
+      st[p].sessions.add(w.date);
+    }
+  });
+  return st;
+}
+
+function renderWoRec(){
+  const el=document.getElementById('woRecBody'); if(!el) return;
+  document.querySelectorAll('.wo-freq').forEach(b=>b.classList.toggle('active',+b.dataset.f===recCfg.freq));
+
+  if(!workouts.length){ el.innerHTML='<p style="font-size:12px;color:var(--text3)">운동 기록이 쌓이면 부위를 추천해줄게.</p>'; renderWoWeightCfg(); return; }
+
+  const DAYS=14;
+  const st=woPartStats(DAYS);
+  const excl=recCfg.excluded;
+
+  // 제외 부위의 가중치는 나머지에 비례 재분배
+  const rawW={...recCfg.weights};
+  excl.forEach(p=>{ rawW[p]=0; });
+  const wTotal=Object.values(rawW).reduce((a,b)=>a+b,0)||1;
+  const tgt={}; Object.keys(rawW).forEach(p=>tgt[p]=rawW[p]/wTotal*100);
+
+  // 실제 비중 (제외 부위는 분모에서 빼서 같은 기준으로 비교)
+  const active=PART_ORDER.filter(p=>!excl.includes(p)&&tgt[p]>0);
+  const actSets=active.reduce((s,p)=>s+st[p].sets,0);
+  const share={}; active.forEach(p=>share[p]= actSets? st[p].sets/actSets*100 : 0);
+
+  // 주당 목표/실제 세트 수 (절대 기준 비교용)
+  const weeklyTotal=(actSets/DAYS)*7;
+  const weeklyTargetTotal = recCfg.freq * 12;   // 세션당 12세트 가정
+  const perPart={}; active.forEach(p=>perPart[p]={
+    actual: +((st[p].sets/DAYS)*7).toFixed(1),
+    target: +(weeklyTargetTotal*tgt[p]/100).toFixed(1)
+  });
+
+  const now=new Date();
+  const hoursSince=p=>st[p].last? (now-st[p].last)/3600000 : 9999;
+
+  // 후보: 제외 아님 + 회복 간격 지남
+  const cands=active.map(p=>({
+    p, gap: share[p]-tgt[p], share:share[p], tgt:tgt[p],
+    h: hoursSince(p), rest: hoursSince(p)>=REST_HOURS,
+    days: st[p].last? Math.floor((now-st[p].last)/86400000) : null
+  })).sort((a,b)=>a.gap-b.gap);
+
+  const ready=cands.filter(c=>c.rest);
+  const resting=cands.filter(c=>!c.rest);
+  // 비중은 초과지만 절대 세트 수가 하한 미달이면 '줄여라'가 아니라 '전체가 적다'는 뜻
+  const over=cands.filter(c=>c.gap>=5 && perPart[c.p].actual>=SETS_PER_PART_MIN*0.6);
+  const relOnly=cands.filter(c=>c.gap>=5 && perPart[c.p].actual<SETS_PER_PART_MIN*0.6);
+
+  const pick=ready[0]||null;
+  const alt=ready[1]||null;
+
+  // 주 횟수에 따른 분할 제안
+  let splitNote='';
+  const sessionsPerPart = recCfg.freq * (pick?tgt[pick.p]:0) / 100;
+  if(recCfg.freq<=3){
+    const second=ready[1];
+    splitNote=`주 ${recCfg.freq}회면 부위를 단독으로 돌릴 세션이 부족해. ${pick?pick.p:''}${second?` + ${second.p}`:''} 묶어서 한 세션에 가는 걸 권해.`;
+  }else if(recCfg.freq>=5){
+    splitNote=`주 ${recCfg.freq}회면 부위별 단독 세션이 가능해. ${pick?pick.p:''} 하나에 집중하고 세션당 ${Math.round(weeklyTargetTotal/recCfg.freq)}세트 정도로 채워.`;
+  }else{
+    splitNote=`주 4회면 ${pick?pick.p:''} 단독 + 가중치 낮은 부위(팔 등) 보조 1~2종목 조합이 맞아.`;
+  }
+
+  const sign=v=>(v>0?'+':'')+v.toFixed(0)+'%p';
+  const col=v=>v<=-5?'#4ade80':v<5?'#fbbf24':'#f87171';
+
+  el.innerHTML=`
+    ${pick?`<div class="a-card good" style="margin-bottom:.6rem;padding:.8rem .9rem">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font-size:22px;font-weight:700">${pick.p}</span>
+        <span style="font-size:11.5px;color:var(--text3)">${pick.days!=null?`${pick.days}일 전 수행`:'기록 없음'}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-top:5px;font-family:'DM Mono',monospace">
+        14일 비중 ${pick.share.toFixed(0)}% (목표 ${pick.tgt.toFixed(0)}%) · 갭 <b style="color:#4ade80">${sign(pick.gap)}</b>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">주당 ${perPart[pick.p].actual}세트 / 목표 ${perPart[pick.p].target}세트</div>
+      ${alt?`<div style="font-size:11.5px;color:var(--text2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border)">대안: <b>${alt.p}</b> (${alt.share.toFixed(0)}% / 목표 ${alt.tgt.toFixed(0)}%)</div>`:''}
+      <div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.55">${splitNote}</div>
+    </div>`:`<div class="a-card info" style="margin-bottom:.6rem"><div style="font-size:12.5px">추천 가능한 부위가 없어 — 모든 부위가 ${REST_HOURS}시간 회복 구간이야. 오늘은 쉬거나 유산소/코어로 가.</div></div>`}
+
+    ${relOnly.length?`<div class="a-card info" style="margin-bottom:.6rem;padding:.7rem .9rem">
+      <div style="font-size:12px;color:var(--text2);line-height:1.55">${relOnly.map(c=>c.p).join(', ')} 쪽은 <b>비중만 높고 절대량은 부족</b>해 (주당 ${relOnly.map(c=>perPart[c.p].actual).join('/')}세트, 권장 ${SETS_PER_PART_MIN}세트 이상). 줄일 게 아니라 전체 볼륨이 적은 상태야.</div>
+    </div>`:''}
+    ${over.length?`<div class="a-card warn" style="margin-bottom:.6rem;padding:.7rem .9rem">
+      <div style="font-size:12.5px;font-weight:600;margin-bottom:4px">⚠ 목표 초과 중</div>
+      ${over.map(c=>`<div style="font-size:11.5px;color:var(--text2);font-family:'DM Mono',monospace">${c.p} ${c.share.toFixed(0)}% (목표 ${c.tgt.toFixed(0)}%) · ${sign(c.gap)} · 주당 ${perPart[c.p].actual}세트</div>`).join('')}
+      <div style="font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.5">뭘 더 할지보다 뭘 줄일지가 총 볼륨 관리엔 더 직접적이야. 이 부위 세트를 덜어서 부족한 쪽으로 옮기면 총량은 그대로 유지돼.</div>
+    </div>`:''}
+
+    <table class="wk-table"><thead><tr>
+      <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주당 세트</th><th>마지막</th>
+    </tr></thead><tbody>
+    ${cands.map(c=>`<tr>
+      <td style="text-align:left;font-weight:500">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
+      <td>${c.share.toFixed(0)}%</td>
+      <td style="color:var(--text3)">${c.tgt.toFixed(0)}%</td>
+      <td style="color:${col(c.gap)};font-weight:600">${sign(c.gap)}</td>
+      <td style="color:${perPart[c.p].actual<SETS_PER_PART_MIN?'#fbbf24':perPart[c.p].actual>SETS_PER_PART_MAX?'#fb923c':'var(--text2)'}">${perPart[c.p].actual}</td>
+      <td style="color:var(--text3);font-size:10.5px">${c.days!=null?c.days+'일':'—'}</td>
+    </tr>`).join('')}
+    ${excl.map(p=>`<tr><td style="text-align:left;color:#6b6b70">${p}<span style="font-size:9.5px"> 제외</span></td><td colspan="5" style="color:#6b6b70;font-size:10.5px">추천에서 제외 — 가중치는 나머지 부위에 재분배</td></tr>`).join('')}
+    </tbody></table>
+
+    <div style="font-size:11px;color:var(--text2);margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);line-height:1.6">
+      <b>주간 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${recCfg.freq}회 × 12세트)
+      ${weeklyTotal>weeklyTargetTotal*1.25?'<br><span style="color:#fb923c">목표보다 25% 이상 많아 — 회복이 안 따라오면 디로드 시점이야.</span>':''}
+      ${weeklyTotal<weeklyTargetTotal*0.7?'<br><span style="color:#fbbf24">목표보다 30% 이상 적어 — 자극이 부족할 수 있어.</span>':''}
+      <br><span style="color:var(--text3);font-size:10.5px">부위별 주당 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.</span>
+    </div>`;
+
+  renderWoWeightCfg();
+}
+
+function renderWoWeightCfg(){
+  const el=document.getElementById('woWeightCfg'); if(!el) return;
+  el.innerHTML=`
+    ${PART_ORDER.map(p=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;width:34px">${p}</span>
+        <input type="number" class="wo-w" data-p="${p}" value="${recCfg.weights[p]??0}" min="0" max="100" step="5"
+               style="width:64px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 7px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:${recCfg.excluded.includes(p)?'#fbbf24':'var(--text3)'};cursor:pointer">
+          <input type="checkbox" class="wo-ex" data-p="${p}" ${recCfg.excluded.includes(p)?'checked':''} style="width:auto;accent-color:#fbbf24"> 제외
+        </label>
+      </div>`).join('')}
+    <button class="btn btn-secondary" id="woWSave" style="font-size:11.5px;padding:5px 12px;margin-top:4px">가중치 저장</button>
+    <div style="font-size:10.5px;color:var(--text3);margin-top:6px;line-height:1.5">
+      합이 100이 아니어도 돼 — 비율로 자동 환산돼. 부상 등으로 제외한 부위의 가중치는 나머지에 비례 재분배되고, 추천 후보에서도 빠져.
+    </div>`;
+  el.querySelector('#woWSave').onclick=()=>{
+    el.querySelectorAll('.wo-w').forEach(i=>{ recCfg.weights[i.dataset.p]=parseFloat(i.value)||0; });
+    recCfg.excluded=[...el.querySelectorAll('.wo-ex')].filter(c=>c.checked).map(c=>c.dataset.p);
+    saveRecCfg(recCfg); renderWoRec();
+  };
 }
 
 // ── 부위 판정 ─────────────────────────────────────────
