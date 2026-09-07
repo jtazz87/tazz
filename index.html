@@ -542,7 +542,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-i';
+const APP_VERSION='2026.08.31-j';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -2231,16 +2231,33 @@ function renderWoRec(){
   const pick=ready[0]||null;
   const alt=ready[1]||null;
 
-  // 주 횟수에 따른 분할 제안
+  // ── 메인 + 보조 조합 추천 ──
+  // 어깨·팔처럼 가중치가 낮은 부위는 전용 세션을 빼는 게 부담이라
+  // 근육군이 겹치는 메인 부위 뒤에 붙이는 게 표준 구성이다.
+  const PAIR={ '등':['팔','어깨'], '가슴':['어깨','팔'], '어깨':['팔'], '하체':['기타'], '팔':['어깨'], '기타':[] };
+  let combo=[];
+  if(pick){
+    // 비중 갭이 음수이거나, 비중은 채웠어도 절대 세트가 권장 하한 미달이면 보조로 붙일 가치가 있다
+    const need=cands.filter(c=>c.p!==pick.p && c.rest &&
+      (c.gap<0 || perPart[c.p].actual<SETS_PER_PART_MIN));
+    (PAIR[pick.p]||[]).forEach(sp=>{ if(need.some(c=>c.p===sp)) combo.push(sp); });
+    // 짝이 없으면 갭이 가장 큰 저가중치 부위를 붙임
+    if(!combo.length){
+      const light=need.filter(c=>tgt[c.p]<=15).sort((a,b)=>a.gap-b.gap);
+      if(light[0]) combo.push(light[0].p);
+    }
+    combo=combo.slice(0,2);
+  }
+  const perSession=Math.round(weeklyTargetTotal/recCfg.freq);
   let splitNote='';
-  const sessionsPerPart = recCfg.freq * (pick?tgt[pick.p]:0) / 100;
-  if(recCfg.freq<=3){
-    const second=ready[1];
-    splitNote=`주 ${recCfg.freq}회면 부위를 단독으로 돌릴 세션이 부족해. ${pick?pick.p:''}${second?` + ${second.p}`:''} 묶어서 한 세션에 가는 걸 권해.`;
-  }else if(recCfg.freq>=5){
-    splitNote=`주 ${recCfg.freq}회면 부위별 단독 세션이 가능해. ${pick?pick.p:''} 하나에 집중하고 세션당 ${Math.round(weeklyTargetTotal/recCfg.freq)}세트 정도로 채워.`;
-  }else{
-    splitNote=`주 4회면 ${pick?pick.p:''} 단독 + 가중치 낮은 부위(팔 등) 보조 1~2종목 조합이 맞아.`;
+  if(pick){
+    if(combo.length){
+      const mainSets=Math.max(6,perSession-combo.length*3);
+      splitNote=`<b>${pick.p} ${mainSets}세트 + ${combo.map(c=>`${c} 3세트`).join(' + ')}</b> 한 세션 구성. ${combo.join('·')}만 따로 하루 빼지 않아도 목표 비중이 채워져.`;
+    }else{
+      splitNote=`${pick.p} 단독 ${perSession}세트. 붙일 만한 보조 부위가 지금은 다 회복 구간이야.`;
+    }
+    if(recCfg.freq<=3) splitNote+=`<br>· 주 ${recCfg.freq}회면 세션당 부위를 2개씩 묶어야 5개 부위가 한 바퀴 돌아.`;
   }
 
   const sign=v=>(v>0?'+':'')+v.toFixed(0)+'%p';
@@ -2255,22 +2272,22 @@ function renderWoRec(){
       <div style="font-size:12px;color:var(--text2);margin-top:5px;font-family:'DM Mono',monospace">
         14일 비중 ${pick.share.toFixed(0)}% (목표 ${pick.tgt.toFixed(0)}%) · 갭 <b style="color:#4ade80">${sign(pick.gap)}</b>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">주당 ${perPart[pick.p].actual}세트 / 목표 ${perPart[pick.p].target}세트</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">주 평균 ${perPart[pick.p].actual}세트 / 목표 ${perPart[pick.p].target}세트 <span style="font-size:10px">(최근 14일 페이스를 주 단위로 환산)</span></div>
       ${alt?`<div style="font-size:11.5px;color:var(--text2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border)">대안: <b>${alt.p}</b> (${alt.share.toFixed(0)}% / 목표 ${alt.tgt.toFixed(0)}%)</div>`:''}
       <div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.55">${splitNote}</div>
     </div>`:`<div class="a-card info" style="margin-bottom:.6rem"><div style="font-size:12.5px">추천 가능한 부위가 없어 — 모든 부위가 ${REST_HOURS}시간 회복 구간이야. 오늘은 쉬거나 유산소/코어로 가.</div></div>`}
 
     ${relOnly.length?`<div class="a-card info" style="margin-bottom:.6rem;padding:.7rem .9rem">
-      <div style="font-size:12px;color:var(--text2);line-height:1.55">${relOnly.map(c=>c.p).join(', ')} 쪽은 <b>비중만 높고 절대량은 부족</b>해 (주당 ${relOnly.map(c=>perPart[c.p].actual).join('/')}세트, 권장 ${SETS_PER_PART_MIN}세트 이상). 줄일 게 아니라 전체 볼륨이 적은 상태야.</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.55">${relOnly.map(c=>c.p).join(', ')} 쪽은 <b>비중만 높고 절대량은 부족</b>해 (주 평균 ${relOnly.map(c=>perPart[c.p].actual).join('/')}세트, 권장 ${SETS_PER_PART_MIN}세트 이상). 줄일 게 아니라 전체 볼륨이 적은 상태야.</div>
     </div>`:''}
     ${over.length?`<div class="a-card warn" style="margin-bottom:.6rem;padding:.7rem .9rem">
       <div style="font-size:12.5px;font-weight:600;margin-bottom:4px">⚠ 목표 초과 중</div>
-      ${over.map(c=>`<div style="font-size:11.5px;color:var(--text2);font-family:'DM Mono',monospace">${c.p} ${c.share.toFixed(0)}% (목표 ${c.tgt.toFixed(0)}%) · ${sign(c.gap)} · 주당 ${perPart[c.p].actual}세트</div>`).join('')}
+      ${over.map(c=>`<div style="font-size:11.5px;color:var(--text2);font-family:'DM Mono',monospace">${c.p} ${c.share.toFixed(0)}% (목표 ${c.tgt.toFixed(0)}%) · ${sign(c.gap)} · 주 평균 ${perPart[c.p].actual}세트</div>`).join('')}
       <div style="font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.5">뭘 더 할지보다 뭘 줄일지가 총 볼륨 관리엔 더 직접적이야. 이 부위 세트를 덜어서 부족한 쪽으로 옮기면 총량은 그대로 유지돼.</div>
     </div>`:''}
 
     <table class="wk-table"><thead><tr>
-      <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주당 세트</th><th>마지막</th>
+      <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주평균<br>세트</th><th>마지막</th>
     </tr></thead><tbody>
     ${cands.map(c=>`<tr>
       <td style="text-align:left;font-weight:500">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
@@ -2284,10 +2301,10 @@ function renderWoRec(){
     </tbody></table>
 
     <div style="font-size:11px;color:var(--text2);margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);line-height:1.6">
-      <b>주간 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${recCfg.freq}회 × 12세트)
+      <b>주 평균 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${recCfg.freq}회 × 12세트)
       ${weeklyTotal>weeklyTargetTotal*1.25?'<br><span style="color:#fb923c">목표보다 25% 이상 많아 — 회복이 안 따라오면 디로드 시점이야.</span>':''}
       ${weeklyTotal<weeklyTargetTotal*0.7?'<br><span style="color:#fbbf24">목표보다 30% 이상 적어 — 자극이 부족할 수 있어.</span>':''}
-      <br><span style="color:var(--text3);font-size:10.5px">부위별 주당 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.</span>
+      <br><span style="color:var(--text3);font-size:10.5px">부위별 주 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.<br>모든 '주' 수치는 달력 주(월~일)가 아니라 <b>최근 14일 페이스를 7일로 환산</b>한 값이야. 주 초반에 항상 부족하게 나오는 걸 피하려고 이렇게 했어.</span>
     </div>`;
 
   renderWoWeightCfg();
