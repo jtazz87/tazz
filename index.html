@@ -542,7 +542,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-k';
+const APP_VERSION='2026.08.31-l';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -585,6 +585,7 @@ let woSetRows     = [];
 let woTrendChart  = null;
 let woMetric      = 'e1rm';     // e1rm | volume | top
 let assistOverride= {};         // 종목별 어시스트 수동 지정
+let subOverride   = {};         // 종목별 세부부위 수동 지정
 let trainLevel    = '중급';      // 훈련 연차 (속도 벤치마크용)
 let woIdxDays     = 90;         // 종합 지수 기간
 let woRangeDays   = 0;          // 그래프 기간 (0=전체)
@@ -597,6 +598,7 @@ function init() {
   try { offsets = JSON.parse(localStorage.getItem(OFFSET_KEY) || '{}'); } catch(e) { offsets = {}; }
   try { workouts = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch(e) { workouts = []; }
   try { assistOverride = JSON.parse(localStorage.getItem(ASSIST_KEY_S) || '{}'); } catch(e) { assistOverride = {}; }
+  try { subOverride = JSON.parse(localStorage.getItem('body-comp-subpart') || '{}'); } catch(e) { subOverride = {}; }
   trainLevel = localStorage.getItem('body-comp-train-level') || '중급';
   goalCfg = Object.assign({type:'',weight:null,muscle:null,fat:null,fatpct:null,fatcap:15.5,act:1.5,minicutStart:null}, goalCfg);
 
@@ -2145,8 +2147,41 @@ function importWorkoutXlsx(file){
 // 판정 단위는 "세트 수". 종목 수로 세면 3세트와 1세트가 같아지고,
 // 톤수로 세면 하체가 항상 이겨서 둘 다 왜곡이 생긴다.
 // 근비대 문헌 표준도 주당 세트 수(부위별 10~20세트)라 절대 기준과 비교도 된다.
-const PART_ORDER=['등','어깨','가슴','하체','팔','기타'];
-const DEFAULT_PART_W={'등':30,'어깨':25,'가슴':20,'하체':20,'팔':5,'기타':0};
+// 메인 = 세션을 통째로 배정하는 부위 / 보조 = 메인 뒤에 붙이는 부위
+const MAIN_PARTS=['등(넓이)','등(폭)','가슴','하체'];
+const AUX_PARTS =['어깨(측면)','어깨(후면)','어깨(전면)','팔(이두)','팔(삼두)'];
+const PART_ORDER=[...MAIN_PARTS,...AUX_PARTS,'기타'];
+const DEFAULT_PART_W={
+  '등(넓이)':25,'등(폭)':20,'가슴':20,'하체':15,
+  '어깨(측면)':8,'어깨(후면)':5,'어깨(전면)':3,'팔(이두)':2,'팔(삼두)':2,'기타':0
+};
+
+// 종목명 → 세부 부위. 순서가 중요하다.
+// 하체를 먼저 걸러야 '레그컬'이 팔(이두), '레그 익스텐션'이 팔(삼두)로 오분류되지 않는다.
+const SUB_RULES=[
+  ['하체',      /레그|스쿼트|힙|카프|타이|런지|데드리프트|둔근|햄스트링/],
+  ['등(넓이)',  /랫풀|랫 ?머신|풀업|친업|풀오버|풀 ?다운/],
+  ['등(폭)',    /로우|로우로우|시티드 ?케이블|체스트 ?서포티드|슈러그|후면 ?등/],
+  ['어깨(측면)',/사이드 ?레터럴|레터럴 ?레이즈|측면|사레레/],
+  ['어깨(후면)',/리어 ?델트|리어|페이스 ?풀|후면 ?델트|비하인드/],
+  ['어깨(전면)',/숄더 ?프레스|오버헤드 ?프레스|프론트 ?레이즈|아놀드|밀리터리/],
+  ['가슴',      /벤치|체스트 ?프레스|펙덱|플라이|딥|인클라인|디클라인|케이블 ?크로스/],
+  ['팔(삼두)', /트라이셉|삼두|푸시 ?다운|킥백|오버헤드 ?익스텐션|프렌치/],
+  ['팔(이두)',  /바이셉|이두|컬|해머|프리처/],
+  ['기타',      /플랭크|크런치|유산소|복부|코어|런닝|사이클/]
+];
+function woSubPart(ex){
+  if(subOverride[ex]) return subOverride[ex];
+  for(const [p,re] of SUB_RULES) if(re.test(ex)) return p;
+  // 규칙에 안 걸리면 기록에 저장된 대분류로 대충 배정
+  const w=workouts.find(x=>x.exercise===ex&&x.cat);
+  const cat=w&&w.cat;
+  if(cat==='등')   return '등(폭)';
+  if(cat==='어깨') return '어깨(측면)';
+  if(cat==='팔')   return '팔(이두)';
+  if(cat==='가슴'||cat==='하체') return cat;
+  return '기타';
+}
 const REST_HOURS=48;              // 같은 부위 회복 간격
 const SETS_PER_PART_MIN=10;       // 주당 부위별 권장 하한
 const SETS_PER_PART_MAX=20;       // 상한
@@ -2179,7 +2214,7 @@ function woPartStats(days){
   const from=new Date(today); from.setDate(from.getDate()-days);
   const st={}; PART_ORDER.forEach(p=>st[p]={sets:0,exCount:0,last:null,sessions:new Set()});
   workouts.forEach(w=>{
-    const p=w.cat||woPartOf(w.exercise);
+    const p=woSubPart(w.exercise);
     if(!st[p]) st[p]={sets:0,exCount:0,last:null,sessions:new Set()};
     const d=woD(w.date);
     if(!st[p].last||d>st[p].last) st[p].last=d;
@@ -2243,29 +2278,37 @@ function renderWoRec(){
   }).sort((a,b)=>a.score-b.score);
 
   const ready=cands.filter(c=>c.rest);
+  const readyMain=ready.filter(c=>MAIN_PARTS.includes(c.p));
+  const readyAux =ready.filter(c=>AUX_PARTS.includes(c.p));
   const resting=cands.filter(c=>!c.rest);
   // 비중은 초과지만 절대 세트 수가 하한 미달이면 '줄여라'가 아니라 '전체가 적다'는 뜻
   const over=cands.filter(c=>c.gap>=5 && perPart[c.p].actual>=SETS_PER_PART_MIN*0.6);
   const relOnly=cands.filter(c=>c.gap>=5 && perPart[c.p].actual<SETS_PER_PART_MIN*0.6);
 
-  const pick=ready[0]||null;
-  const alt=ready[1]||null;
+  // 메인 부위만 세션 주제가 된다. 어깨·팔은 가중치가 낮아 갭 계산상 계속 1순위로 튀지만
+  // 전용 세션을 빼기엔 부담이라 구조적으로 보조 위치로 고정한다.
+  const pick=readyMain[0]||null;
+  const alt=readyMain[1]||null;
 
   // ── 메인 + 보조 조합 추천 ──
   // 어깨·팔처럼 가중치가 낮은 부위는 전용 세션을 빼는 게 부담이라
   // 근육군이 겹치는 메인 부위 뒤에 붙이는 게 표준 구성이다.
-  const PAIR={ '등':['팔','어깨'], '가슴':['어깨','팔'], '어깨':['팔'], '하체':['기타'], '팔':['어깨'], '기타':[] };
+  // 메인 부위와 근육군이 겹치는 보조를 붙인다.
+  // 등 당기기엔 이두·후면삼각근이, 가슴 밀기엔 전면삼각근·삼두가 이미 동원되므로
+  // 같은 세션에 넣는 게 회복 부담이 가장 적다.
+  const PAIR={
+    '등(넓이)':['팔(이두)','어깨(후면)'],
+    '등(폭)'  :['어깨(후면)','팔(이두)'],
+    '가슴'    :['어깨(전면)','팔(삼두)'],
+    '하체'    :['기타']
+  };
   let combo=[];
   if(pick){
-    // 비중 갭이 음수이거나, 비중은 채웠어도 절대 세트가 권장 하한 미달이면 보조로 붙일 가치가 있다
-    const need=cands.filter(c=>c.p!==pick.p && c.rest &&
-      (c.gap<0 || perPart[c.p].actual<SETS_PER_PART_MIN));
+    const need=readyAux.filter(c=>c.gap<0 || perPart[c.p].actual<SETS_PER_PART_MIN);
     (PAIR[pick.p]||[]).forEach(sp=>{ if(need.some(c=>c.p===sp)) combo.push(sp); });
-    // 짝이 없으면 갭이 가장 큰 저가중치 부위를 붙임
-    if(!combo.length){
-      const light=need.filter(c=>tgt[c.p]<=15).sort((a,b)=>a.gap-b.gap);
-      if(light[0]) combo.push(light[0].p);
-    }
+    // 측면 삼각근은 부하가 낮아 어떤 세션에든 붙일 수 있다
+    if(need.some(c=>c.p==='어깨(측면)') && !combo.includes('어깨(측면)') && combo.length<2) combo.push('어깨(측면)');
+    if(!combo.length && need.length) combo.push(need.slice().sort((a,b)=>a.score-b.score)[0].p);
     combo=combo.slice(0,2);
   }
   const perSession=Math.round(weeklyTargetTotal/recCfg.freq);
@@ -2294,13 +2337,13 @@ function renderWoRec(){
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:4px">주 평균 ${perPart[pick.p].actual}세트 / 목표 ${perPart[pick.p].target}세트 <span style="font-size:10px">(최근 14일 페이스를 주 단위로 환산)</span></div>
       ${(()=>{
-        const gapTop=cands.filter(c=>c.rest).sort((a,b)=>a.gap-b.gap)[0];
+        const gapTop=readyMain.slice().sort((a,b)=>a.gap-b.gap)[0];
         if(!gapTop||gapTop.p===pick.p||pick.bonus<2) return '';
         return `<div style="font-size:11px;color:#60a5fa;margin-top:3px">${pick.days}일 방치 가점 ${pick.bonus.toFixed(0)}점으로 순위가 바뀌었어 — 볼륨 갭만으로는 ${koSub(gapTop.p)} 1순위</div>`;
       })()}
       ${alt?`<div style="font-size:11.5px;color:var(--text2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border)">대안: <b>${alt.p}</b> (${alt.share.toFixed(0)}% / 목표 ${alt.tgt.toFixed(0)}%)</div>`:''}
       <div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.55">${splitNote}</div>
-    </div>`:`<div class="a-card info" style="margin-bottom:.6rem"><div style="font-size:12.5px">추천 가능한 부위가 없어 — 모든 부위가 ${REST_HOURS}시간 회복 구간이야. 오늘은 쉬거나 유산소/코어로 가.</div></div>`}
+    </div>`:`<div class="a-card info" style="margin-bottom:.6rem"><div style="font-size:12.5px">메인 부위(${MAIN_PARTS.filter(p=>!excl.includes(p)).join(', ')})가 전부 ${REST_HOURS}시간 회복 구간이야. 오늘은 쉬거나, 보조${readyAux.length?` (${readyAux.slice(0,2).map(c=>c.p).join(', ')})`:''}·유산소·코어로 가볍게 가.</div></div>`}
 
     ${relOnly.length?`<div class="a-card info" style="margin-bottom:.6rem;padding:.7rem .9rem">
       <div style="font-size:12px;color:var(--text2);line-height:1.55">${relOnly.map(c=>c.p).join('·')} 쪽은 <b>비중만 높고 절대량은 부족</b>해 (주 평균 ${relOnly.map(c=>perPart[c.p].actual).join('/')}세트, 권장 ${SETS_PER_PART_MIN}세트 이상). 줄일 게 아니라 전체 볼륨이 적은 상태야.</div>
@@ -2314,8 +2357,19 @@ function renderWoRec(){
     <table class="wk-table"><thead><tr>
       <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주평균<br>세트</th><th>마지막</th><th>순위<br>점수</th>
     </tr></thead><tbody>
-    ${cands.map(c=>`<tr>
+    <tr><td colspan="7" style="text-align:left;font-size:10.5px;color:var(--text3);padding-top:6px">메인 — 세션 주제</td></tr>
+    ${cands.filter(c=>MAIN_PARTS.includes(c.p)).map(c=>`<tr>
       <td style="text-align:left;font-weight:500">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
+      <td>${c.share.toFixed(0)}%</td>
+      <td style="color:var(--text3)">${c.tgt.toFixed(0)}%</td>
+      <td style="color:${col(c.gap)};font-weight:600">${sign(c.gap)}</td>
+      <td style="color:${perPart[c.p].actual<SETS_PER_PART_MIN?'#fbbf24':perPart[c.p].actual>SETS_PER_PART_MAX?'#fb923c':'var(--text2)'}">${perPart[c.p].actual}</td>
+      <td style="color:${c.days!=null&&c.days>=7?'#fbbf24':'var(--text3)'};font-size:10.5px">${c.days!=null?c.days+'일':'—'}${c.days!=null&&c.days>=7?' ⚠':''}</td>
+      <td style="color:var(--text3);font-size:10.5px">${c.score.toFixed(0)}</td>
+    </tr>`).join('')}
+    <tr><td colspan="7" style="text-align:left;font-size:10.5px;color:var(--text3);padding-top:8px">보조 — 메인 뒤에 붙임</td></tr>
+    ${cands.filter(c=>AUX_PARTS.includes(c.p)||c.p==='기타').map(c=>`<tr>
+      <td style="text-align:left;padding-left:10px;color:var(--text2)">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
       <td>${c.share.toFixed(0)}%</td>
       <td style="color:var(--text3)">${c.tgt.toFixed(0)}%</td>
       <td style="color:${col(c.gap)};font-weight:600">${sign(c.gap)}</td>
@@ -2343,7 +2397,7 @@ function renderWoWeightCfg(){
   el.innerHTML=`
     ${PART_ORDER.map(p=>`
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;width:34px">${p}</span>
+        <span style="font-size:12px;width:76px">${p}</span>
         <input type="number" class="wo-w" data-p="${p}" value="${recCfg.weights[p]??0}" min="0" max="100" step="5"
                style="width:64px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 7px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace">
         <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:${recCfg.excluded.includes(p)?'#fbbf24':'var(--text3)'};cursor:pointer">
@@ -2351,6 +2405,10 @@ function renderWoWeightCfg(){
         </label>
       </div>`).join('')}
     <button class="btn btn-secondary" id="woWSave" style="font-size:11.5px;padding:5px 12px;margin-top:4px">가중치 저장</button>
+    <div style="font-size:10.5px;color:var(--text3);margin-top:6px;line-height:1.5">
+      <b>메인</b> ${MAIN_PARTS.join(' · ')} — 세션 주제가 되는 부위<br>
+      <b>보조</b> ${AUX_PARTS.join(' · ')} — 메인 뒤에 3세트씩 붙는 부위. 추천 1순위로는 안 올라와.
+    </div>
     <div style="font-size:10.5px;color:var(--text3);margin-top:6px;line-height:1.5">
       합이 100이 아니어도 돼 — 비율로 자동 환산돼. 부상 등으로 제외한 부위의 가중치는 나머지에 비례 재분배되고, 추천 후보에서도 빠져.
     </div>`;
