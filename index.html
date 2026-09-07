@@ -438,6 +438,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <label>종목 선택 <span style="color:var(--text3);font-weight:400">(위 입력과 자동 연동)</span></label>
         <select id="woTrendSelect"><option value="">— 종목 —</option></select>
       </div>
+      <label id="woAssistWrap" style="display:none;align-items:center;gap:6px;font-size:11.5px;color:var(--amber);cursor:pointer;margin-bottom:.6rem">
+        <input id="woAssistChk" type="checkbox" style="width:auto;accent-color:#fbbf24"> 보조(어시스트) 종목 — 무게가 낮을수록 강한 것으로 계산
+      </label>
       <div id="woMetricRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem">
         <button type="button" class="g-btn wo-metric active" data-m="e1rm">e1RM (핵심)</button>
         <button type="button" class="g-btn wo-metric" data-m="volume">총 볼륨</button>
@@ -519,7 +522,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-f';
+const APP_VERSION='2026.08.31-h';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -532,6 +535,7 @@ const TREND_KEY     = 'body-comp-trend-range';
 const API_KEY_S     = 'gemini-api-key';
 const WORKOUT_KEY   = 'body-comp-workouts';
 const EXPORT_KEY    = 'body-comp-last-export';
+const ASSIST_KEY_S  = 'body-comp-assist-map';
 const EX_PRESETS    = {
   '하체':['시티드 레그컬','라잉 레그컬','레그 익스텐션','힙쓰러스트','인아웃타이','카프레이즈','핵스쿼트','V스쿼트','레그프레스','스쿼트'],
   '등':['체스트서포티드로우','시티드케이블로우','머신로우','원암덤벨로우','랫풀다운','풀업'],
@@ -560,6 +564,8 @@ let woEditIdx     = -1;
 let woSetRows     = [];
 let woTrendChart  = null;
 let woMetric      = 'e1rm';     // e1rm | volume | top
+let assistOverride= {};         // 종목별 어시스트 수동 지정
+let trainLevel    = '중급';      // 훈련 연차 (속도 벤치마크용)
 let woIdxDays     = 90;         // 종합 지수 기간
 let woRangeDays   = 0;          // 그래프 기간 (0=전체)
 
@@ -570,6 +576,8 @@ function init() {
   try { goalCfg = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'); } catch(e) { goalCfg = {}; }
   try { offsets = JSON.parse(localStorage.getItem(OFFSET_KEY) || '{}'); } catch(e) { offsets = {}; }
   try { workouts = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch(e) { workouts = []; }
+  try { assistOverride = JSON.parse(localStorage.getItem(ASSIST_KEY_S) || '{}'); } catch(e) { assistOverride = {}; }
+  trainLevel = localStorage.getItem('body-comp-train-level') || '중급';
   goalCfg = Object.assign({type:'',weight:null,muscle:null,fat:null,fatpct:null,fatcap:15.5,act:1.5,minicutStart:null}, goalCfg);
 
   // Default offsets
@@ -610,6 +618,7 @@ function saveGyms()    { localStorage.setItem(GYM_KEY,    JSON.stringify(gyms));
 function saveGoal()    { localStorage.setItem(GOAL_KEY,   JSON.stringify(goalCfg)); }
 function saveOffsets() { localStorage.setItem(OFFSET_KEY, JSON.stringify(offsets)); }
 function saveWorkouts(){ localStorage.setItem(WORKOUT_KEY, JSON.stringify(workouts)); }
+function saveAssist()  { localStorage.setItem(ASSIST_KEY_S, JSON.stringify(assistOverride)); }
 function saveTrend()   { localStorage.setItem(TREND_KEY,  JSON.stringify({start:trendStart,end:trendEnd})); }
 function getApiKey()   { return localStorage.getItem(API_KEY_S)||''; }
 
@@ -774,6 +783,22 @@ function bindAll(){
     document.getElementById('woImportFile').addEventListener('change',e=>{
       if(e.target.files[0]) importWorkoutXlsx(e.target.files[0]);
       e.target.value='';
+    });
+  });
+  wire('훈련 연차',()=>{
+    document.getElementById('woIndexBody').addEventListener('click',e=>{
+      const b=e.target.closest('.wo-lv'); if(!b) return;
+      trainLevel=b.dataset.lv;
+      localStorage.setItem('body-comp-train-level',trainLevel);
+      renderWoIndex();
+    });
+  });
+  wire('보조종목 토글',()=>{
+    document.getElementById('woAssistChk').addEventListener('change',e=>{
+      const ex=document.getElementById('woTrendSelect').value;
+      if(!ex) return;
+      assistOverride[ex]=e.target.checked;
+      saveAssist(); renderWoTrend(); renderWoIndex();
     });
   });
   wire('기간 토글',()=>{
@@ -1932,13 +1957,25 @@ function woSessions(ex){
   const by={};
   workouts.filter(w=>w.exercise===ex).forEach(w=>{
     const m=woMetrics(w);
-    const s=by[w.date]||(by[w.date]={date:w.date,volume:0,totalReps:0,sets:0,top:0,topReps:0,e1rm:0});
+    const s=by[w.date]||(by[w.date]={date:w.date,volume:0,totalReps:0,sets:0,top:0,topReps:0,e1rm:0,gyms:new Set()});
     s.volume+=m.volume; s.totalReps+=m.reps; s.sets+=m.sets;
+    if(w.gym) s.gyms.add(w.gym);
     if(m.top>s.top){ s.top=m.top; s.topReps=m.topReps; }
     if(m.e1rm>s.e1rm) s.e1rm=m.e1rm;
   });
-  return Object.values(by).sort((a,b)=>a.date<b.date?-1:1);
+  const arr=Object.values(by).sort((a,b)=>a.date<b.date?-1:1);
+  arr.ex=ex;
+  return arr;
 }
+
+// ── 어시스트(보조) 종목 판정 ────────────────────────────
+// 보조 중량은 낮을수록 강한 것 → 변화율 부호를 뒤집어야 함
+const ASSIST_KEY=/어시스트|assist|보조|중력|그래비트론/i;
+function woIsAssist(ex){
+  if(assistOverride[ex]!==undefined) return assistOverride[ex];
+  return ASSIST_KEY.test(ex);
+}
+const OUTLIER_PCT=40;   // 4주 기준 ±40% 초과는 기기 변경 의심
 
 const woNum=n=>Math.round(n).toLocaleString();
 const woD=s=>{const p=s.split('.');return new Date(2000+parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));};
@@ -2110,13 +2147,80 @@ function woWindowChange(S,days){
   const avg=a=>a.reduce((x,s)=>x+s[key],0)/a.length;
   const b=avg(near), r=avg(rec);
   if(!(b>0)) return null;
-  // 두 구간 사이 실제 간격이 기간의 40% 미만이면 비교 의미 없음
   const gap=(woD(rec[0].date)-woD(near[near.length-1].date))/86400000;
   if(gap < days*0.35) return null;
-  return {pct:(r-b)/b*100, base:b, recent:r, unit:key==='e1rm'?'kg':'회', n, gap:Math.round(gap)};
+
+  let pct=(r-b)/b*100;
+  // ① 어시스트 종목: 보조 중량이 줄수록 강해진 것 → 부호 반전
+  const assist=woIsAssist(S.ex||'');
+  if(assist) pct=-pct;
+
+  // ② 기준 구간과 최근 구간의 헬스장이 다르면 기기가 달라 비교 불가
+  const gA=new Set(), gB=new Set();
+  const collect=(arr,set)=>arr.forEach(s=>{ if(s.gyms) [...s.gyms].forEach(g=>set.add(g)); });
+  collect(near,gA); collect(rec,gB);
+  const sameGym = gA.size===0||gB.size===0 || [...gB].some(g=>gA.has(g));
+
+  // ③ 기간 대비 과도한 변화는 기기 변경·기록 오류 의심
+  const limit=OUTLIER_PCT*Math.max(1,days/28);
+  const outlier=Math.abs(pct)>limit;
+
+  const flags=[];
+  if(assist)   flags.push('보조중량 반전');
+  if(!sameGym) flags.push('기기 다름');
+  if(outlier)  flags.push('이상치');
+  return {pct, base:b, recent:r, unit:key==='e1rm'?'kg':'회', n, gap:Math.round(gap),
+          assist, sameGym, outlier, trusted:sameGym&&!outlier, flags,
+          gymsA:[...gA], gymsB:[...gB], limit:Math.round(limit)};
 }
 
 const WO_PERIODS=[[28,'4주'],[90,'3개월'],[180,'6개월'],[365,'1년']];
+
+
+// ── 과부하 진행 속도 평가 ───────────────────────────────
+// 기간이 다른 값을 비교하려면 복리 월 환산이 필요하다.
+// 4주 +12.9%와 1년 +67%는 월 환산하면 각각 +12.9%/월, +4.4%/월.
+function woMonthlyRate(pct,days){
+  return (Math.pow(1+pct/100, 30/days)-1)*100;
+}
+
+// 훈련 연차별 기대 월 성장률 (e1RM 기준, 잉여 칼로리 상태)
+const SPEED_BENCH={
+  '초급':  {label:'초급 (1년 미만)',  fast:4.0, good:2.5, slow:1.2},
+  '중급':  {label:'중급 (1~3년)',     fast:2.0, good:1.2, slow:0.5},
+  '상급':  {label:'상급 (3년 이상)',  fast:1.0, good:0.6, slow:0.2}
+};
+
+function woSpeedGrade(rate,level,phase){
+  const b=SPEED_BENCH[level]||SPEED_BENCH['중급'];
+  // 컷팅 중에는 유지가 정상 — 기준이 완전히 다르다
+  if(phase==='컷팅'){
+    if(rate>=0)      return {t:'컷팅 중 근력 상승 — 매우 좋음',c:'good',icon:'🚀'};
+    if(rate>=-1)     return {t:'컷팅 중 근력 유지 — 정상',c:'good',icon:'✅'};
+    if(rate>=-2.5)   return {t:'완만한 하락 — 허용 범위',c:'info',icon:'➖'};
+    return {t:'근력 하락 큼 — 적자 폭·단백질 점검',c:'warn',icon:'⚠️'};
+  }
+  if(rate>=b.fast)   return {t:`${b.label} 기준 매우 빠름`,c:'good',icon:'🚀'};
+  if(rate>=b.good)   return {t:`${b.label} 기준 양호`,c:'good',icon:'📈'};
+  if(rate>=b.slow)   return {t:`${b.label} 기준 보통`,c:'info',icon:'➡️'};
+  if(rate>=0)        return {t:`${b.label} 기준 느림`,c:'caution',icon:'🐢'};
+  return {t:'하락 중',c:'warn',icon:'📉'};
+}
+
+// 창별 월 환산율을 모아 가속/감속 판정
+function woSpeedProfile(){
+  const exNames=[...new Set(workouts.map(w=>w.exercise))];
+  const out={};
+  WO_PERIODS.forEach(([d])=>{
+    const vals=[];
+    exNames.forEach(ex=>{
+      const c=woWindowChange(woSessions(ex),d);
+      if(c&&c.trusted) vals.push(woMonthlyRate(c.pct,d));
+    });
+    out[d]=vals.length?{rate:vals.reduce((a,b)=>a+b,0)/vals.length,n:vals.length}:null;
+  });
+  return out;
+}
 
 // ── 부위별 · 전체 종합 과부하 지수 ──────────────────────
 function renderWoIndex(){
@@ -2130,7 +2234,7 @@ function renderWoIndex(){
     const c=woWindowChange(S,woIdxDays);
     if(!c){ skipped.push(ex); return; }
     const p=woPartOf(ex);
-    (byPart[p]||(byPart[p]=[])).push({ex,pct:c.pct,n:S.length});
+    (byPart[p]||(byPart[p]=[])).push({ex,pct:c.pct,n:S.length,c});
   });
 
   const parts=Object.keys(byPart);
@@ -2138,9 +2242,27 @@ function renderWoIndex(){
     el.innerHTML=`<p style="font-size:12px;color:var(--text3)">${woIdxDays}일 전과 비교할 데이터가 아직 부족해. 더 짧은 기간을 골라보거나 기록이 더 쌓이면 나와.</p>`;
     return;
   }
-  // 부위 평균 → 부위끼리 동일 가중 평균 (종목 많은 부위가 지배하지 않게)
-  const partAvg={}; parts.forEach(p=>partAvg[p]=byPart[p].reduce((s,x)=>s+x.pct,0)/byPart[p].length);
-  const overall=parts.reduce((s,p)=>s+partAvg[p],0)/parts.length;
+  // 신뢰 가능한 항목만 평균에 사용 (기기 다름·이상치는 표시하되 제외)
+  const trustedParts=parts.filter(p=>byPart[p].some(x=>x.c.trusted));
+  const partAvg={};
+  parts.forEach(p=>{
+    const t=byPart[p].filter(x=>x.c.trusted);
+    partAvg[p]= t.length? t.reduce((s,x)=>s+x.pct,0)/t.length : null;
+  });
+  // 종목 2개 이하 부위는 가중치 0.5 (표본이 얇아 이상치에 취약)
+  let wSum=0, vSum=0;
+  trustedParts.forEach(p=>{
+    const t=byPart[p].filter(x=>x.c.trusted).length;
+    const wgt = t>=3?1 : t===2?0.7 : 0.4;
+    wSum+=wgt; vSum+=partAvg[p]*wgt;
+  });
+  const overall= wSum? vSum/wSum : null;
+  const excluded=parts.flatMap(p=>byPart[p].filter(x=>!x.c.trusted));
+
+  if(overall===null){
+    el.innerHTML=`<p style="font-size:12px;color:var(--text3)">비교 가능한 종목이 전부 '기기 다름' 또는 '이상치'로 걸렸어. 기간을 바꿔보거나 기록에 헬스장을 채워줘.</p>`;
+    return;
+  }
 
   const col=v=>v>=5?'#4ade80':v>=1?'#86efac':v>-1?'#fbbf24':v>-5?'#fb923c':'#f87171';
   const sign=v=>(v>0?'+':'')+v.toFixed(1)+'%';
@@ -2149,6 +2271,38 @@ function renderWoIndex(){
   else if(overall>=1){ verdict='완만하게 진행 중'; vc='good'; }
   else if(overall>-1){ verdict='전신 정체'; vc='info'; }
   else { verdict='전신 하락'; vc='warn'; }
+
+  // ── 진행 속도 ──
+  const rate=woMonthlyRate(overall,woIdxDays);
+  const phase=goalCfg.type||'';
+  const grade=woSpeedGrade(rate,trainLevel,phase);
+  const prof=woSpeedProfile();
+  const shortR=prof[28]?prof[28].rate:null;
+  const longR=prof[180]?prof[180].rate:(prof[90]?prof[90].rate:null);
+  let trend='';
+  if(shortR!=null&&longR!=null){
+    const diff=shortR-longR;
+    if(diff>=0.5)       trend=`<span style="color:#4ade80">가속 중</span> — 최근 4주(${shortR.toFixed(1)}%/월)가 장기 평균(${longR.toFixed(1)}%/월)보다 빨라`;
+    else if(diff>-0.5)  trend=`<span style="color:#fbbf24">일정한 속도</span> — 4주 ${shortR.toFixed(1)}%/월 · 장기 ${longR.toFixed(1)}%/월`;
+    else                trend=`<span style="color:#fb923c">감속 중</span> — 최근 4주(${shortR.toFixed(1)}%/월)가 장기 평균(${longR.toFixed(1)}%/월)보다 느려`;
+  }
+  const bench=SPEED_BENCH[trainLevel];
+  const speedCard=`<div class="a-card ${grade.c}" style="margin-bottom:.6rem;padding:.75rem .9rem">
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:5px">
+      <span style="font-size:15px">${grade.icon}</span>
+      <span style="font-size:19px;font-weight:700;font-family:'DM Mono',monospace;color:${col(rate)}">${(rate>0?'+':'')+rate.toFixed(1)}%<span style="font-size:12px;color:var(--text3)">/월</span></span>
+      <span style="font-size:12.5px;font-weight:500">${grade.t}</span>
+    </div>
+    ${trend?`<div style="font-size:11.5px;color:var(--text2);line-height:1.55">${trend}</div>`:''}
+    <div style="font-size:10.5px;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);line-height:1.55">
+      기간별 월 환산: ${WO_PERIODS.map(([d,l])=>prof[d]?`${l} ${prof[d].rate>0?'+':''}${prof[d].rate.toFixed(1)}%`:`${l} —`).join(' · ')}<br>
+      ${phase==='컷팅'?'컷팅 중이라 유지(0%/월)가 정상 기준이야.':`${bench.label} 기대치: 양호 ${bench.good}%/월 이상 · 정체 ${bench.slow}%/월 미만`}
+    </div>
+    <div style="margin-top:7px;display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:10.5px;color:var(--text3)">훈련 연차</span>
+      ${Object.keys(SPEED_BENCH).map(k=>`<button type="button" class="g-btn wo-lv ${k===trainLevel?'active':''}" data-lv="${k}" style="font-size:10.5px;padding:3px 9px">${k}</button>`).join('')}
+    </div>
+  </div>`;
 
   const order=['등','가슴','하체','어깨','팔','기타'];
   const sorted=parts.sort((a,b)=>(order.indexOf(a)+99)%99-(order.indexOf(b)+99)%99);
@@ -2159,19 +2313,29 @@ function renderWoIndex(){
         <span style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:${col(overall)}">${sign(overall)}</span>
         <span style="font-size:13px;font-weight:500">${verdict}</span>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">${WO_PERIODS.find(p=>p[0]===woIdxDays)?.[1]||woIdxDays+'일'} 전 대비 · 부위 ${parts.length}개 · 종목 ${parts.reduce((s,p)=>s+byPart[p].length,0)}개</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${WO_PERIODS.find(p=>p[0]===woIdxDays)?.[1]||woIdxDays+'일'} 전 대비 · 집계에 쓴 종목 ${parts.reduce((s,p)=>s+byPart[p].filter(x=>x.c.trusted).length,0)}개${excluded.length?` · 제외 ${excluded.length}개`:''}</div>
     </div>
+    ${speedCard}
     <table class="wk-table"><tbody>
-    ${sorted.map(p=>`
-      <tr><td style="text-align:left;font-weight:500">${p}<span style="color:var(--text3);font-weight:400"> (${byPart[p].length})</span></td>
-          <td style="color:${col(partAvg[p])};font-weight:600">${sign(partAvg[p])}</td></tr>
+    ${sorted.map(p=>{
+      const tn=byPart[p].filter(x=>x.c.trusted).length;
+      return `
+      <tr><td style="text-align:left;font-weight:500">${p}<span style="color:var(--text3);font-weight:400"> (${tn}${tn<byPart[p].length?'/'+byPart[p].length:''})</span>${tn>0&&tn<3?`<span style="color:var(--text3);font-size:10px"> 표본 적음</span>`:''}</td>
+          <td style="${partAvg[p]!=null?`color:${col(partAvg[p])};font-weight:600`:'color:var(--text3)'}">${partAvg[p]!=null?sign(partAvg[p]):'—'}</td></tr>
       ${byPart[p].sort((a,b)=>b.pct-a.pct).map(x=>`
-      <tr><td style="text-align:left;padding-left:14px;color:var(--text3);font-size:11px">${x.ex}</td>
-          <td style="color:${col(x.pct)};font-size:11px">${sign(x.pct)}</td></tr>`).join('')}
-    `).join('')}
+      <tr><td style="text-align:left;padding-left:14px;font-size:11px;color:${x.c.trusted?'var(--text3)':'#6b6b70'}">${x.ex}${x.c.flags.length?`<span style="color:#fbbf24;font-size:9.5px"> ⚠ ${x.c.flags.join('·')}</span>`:''}</td>
+          <td style="color:${x.c.trusted?col(x.pct):'#6b6b70'};font-size:11px;${x.c.trusted?'':'text-decoration:line-through'}">${sign(x.pct)}</td></tr>`).join('')}`;
+    }).join('')}
     </tbody></table>
-    ${skipped.length?`<div style="font-size:10.5px;color:var(--text3);margin-top:6px">판정 제외 ${skipped.length}종목 (기간 내 비교 데이터 부족): ${skipped.slice(0,6).join(', ')}${skipped.length>6?' 외':''}</div>`:''}
-    <div style="font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.5">종목별 e1RM(맨몸은 총 횟수)의 최근 2~3세션 평균을 ${woIdxDays}일 전 같은 수의 세션과 비교. 부위 평균을 낸 뒤 부위끼리 동일 가중으로 합산해서, 종목 수가 많은 부위가 전체를 좌우하지 않게 했어.</div>`;
+    ${excluded.length?`<div style="font-size:10.5px;color:#fbbf24;margin-top:7px;line-height:1.55">⚠ 집계 제외 ${excluded.length}종목 — ${[...new Set(excluded.flatMap(x=>x.c.flags))].join(', ')}. 값은 위에 그대로 보이지만 평균에는 안 들어가.</div>`:''}
+    ${skipped.length?`<div style="font-size:10.5px;color:var(--text3);margin-top:6px">비교 데이터 부족 ${skipped.length}종목: ${skipped.slice(0,5).join(', ')}${skipped.length>5?' 외':''}</div>`:''}
+    <div style="font-size:10.5px;color:var(--text3);margin-top:6px;line-height:1.55">
+      종목별 e1RM(맨몸은 총 횟수)의 최근 2~3세션 평균을 ${woIdxDays}일 전 같은 수의 세션과 비교.<br>
+      · <b>보조중량 반전</b>: 어시스트 종목은 무게가 줄수록 강해진 것이라 부호를 뒤집음<br>
+      · <b>기기 다름</b>: 비교 두 구간의 헬스장이 달라 같은 종목이라도 기계 스펙이 다름 → 제외<br>
+      · <b>이상치</b>: 기간 대비 변화가 과도(±${Math.round(OUTLIER_PCT*Math.max(1,woIdxDays/28))}% 초과) → 기기 변경·기록 오류 의심으로 제외<br>
+      · 부위 가중: 신뢰 종목 3개 이상 1.0 / 2개 0.7 / 1개 0.4
+    </div>`;
 }
 
 function renderWoTrend(){
@@ -2186,7 +2350,12 @@ function renderWoTrendInner(){
   const ex=document.getElementById('woTrendSelect').value;
   const sum=document.getElementById('woTrendSummary');
   if(woTrendChart){ woTrendChart.destroy(); woTrendChart=null; }
-  if(!ex){ sum.innerHTML='<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem">종목을 고르면 과부하 추세를 보여줘.</p>'; return; }
+  if(!ex){ sum.innerHTML='<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem">종목을 고르면 과부하 추세를 보여줘.</p>';
+    const a=document.getElementById('woAssistWrap'); if(a) a.style.display='none';
+    return; }
+
+  const aw=document.getElementById('woAssistWrap');
+  if(aw){ aw.style.display='flex'; document.getElementById('woAssistChk').checked=woIsAssist(ex); }
 
   const S=woSessions(ex);
   if(!S.length){ sum.innerHTML=`<p style="font-size:12px;color:var(--text3);margin-bottom:.5rem"><b style="color:var(--text2)">${ex}</b> — 아직 기록이 없어.</p>`; return; }
@@ -2249,11 +2418,11 @@ function renderWoTrendInner(){
   const periodTable=anyRow?`<table class="wk-table" style="margin-bottom:.6rem"><tbody>
     ${rows.map(r=>`<tr>
       <td style="text-align:left;color:var(--text2)">${r.label} 전 대비</td>
-      <td style="${r.c?`color:${pcol(r.c.pct)};font-weight:600`:'color:var(--text3)'}">${r.c?((r.c.pct>0?'+':'')+r.c.pct.toFixed(1)+'%'):'—'}</td>
-      <td style="color:var(--text3);font-size:10.5px">${r.c?`${woNum(r.c.base)} → ${woNum(r.c.recent)}${r.c.unit}`:'데이터 부족'}</td>
+      <td style="${r.c?`color:${r.c.trusted?pcol(r.c.pct):'#6b6b70'};font-weight:600`:'color:var(--text3)'}">${r.c?((r.c.pct>0?'+':'')+r.c.pct.toFixed(1)+'%'):'—'}</td>
+      <td style="color:var(--text3);font-size:10.5px">${r.c?`${woNum(r.c.base)} → ${woNum(r.c.recent)}${r.c.unit}${r.c.flags.length?`<br><span style="color:#fbbf24;font-size:9.5px">⚠ ${r.c.flags.join(' · ')}</span>`:''}`:'데이터 부족'}</td>
     </tr>`).join('')}
   </tbody></table>
-  <div style="font-size:10.5px;color:var(--text3);margin:-.3rem 0 .5rem;line-height:1.5">단기와 장기가 갈릴 때가 정보야. 4주 정체 + 6개월 상승이면 정상적인 정체 구간이고, 둘 다 정체면 프로그램을 바꿀 때야.</div>`:'';
+  <div style="font-size:10.5px;color:var(--text3);margin:-.3rem 0 .5rem;line-height:1.5">단기와 장기가 갈릴 때가 정보야. 4주 정체 + 6개월 상승이면 정상적인 정체 구간이고, 둘 다 정체면 프로그램을 바꿀 때야.${woIsAssist(ex)?'<br><span style="color:#fbbf24">보조 종목으로 계산 중 — 무게가 줄면 상승으로 표시돼.</span>':''}</div>`:'';
 
   const L=S[S.length-1];
   const detail = bw
