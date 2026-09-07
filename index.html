@@ -422,6 +422,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     <!-- 종목별 추세 -->
     <div class="card">
+      <div class="card-label">💪 전체 과부하 지수 <span style="color:var(--text3);font-weight:400;font-size:11px">— 부위별 종합</span></div>
+      <div id="woIndexRange" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.7rem">
+        <button type="button" class="g-btn wo-idx" data-d="28">4주</button>
+        <button type="button" class="g-btn wo-idx active" data-d="90">3개월</button>
+        <button type="button" class="g-btn wo-idx" data-d="180">6개월</button>
+        <button type="button" class="g-btn wo-idx" data-d="365">1년</button>
+      </div>
+      <div id="woIndexBody"></div>
+    </div>
+
+    <div class="card">
       <div class="card-label">점진적 과부하 추세</div>
       <div class="field" style="max-width:260px;margin-bottom:.6rem">
         <label>종목 선택 <span style="color:var(--text3);font-weight:400">(위 입력과 자동 연동)</span></label>
@@ -433,14 +444,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button type="button" class="g-btn wo-metric" data-m="top">탑세트 중량</button>
       </div>
       <div id="woTrendSummary"></div>
+      <div id="woChartRange" style="display:flex;gap:5px;flex-wrap:wrap;margin:.6rem 0 .4rem">
+        <button type="button" class="g-btn wo-range" data-d="30">1개월</button>
+        <button type="button" class="g-btn wo-range" data-d="90">3개월</button>
+        <button type="button" class="g-btn wo-range" data-d="180">6개월</button>
+        <button type="button" class="g-btn wo-range" data-d="365">1년</button>
+        <button type="button" class="g-btn wo-range active" data-d="0">전체</button>
+      </div>
       <div class="chart-wrap" style="height:230px"><canvas id="woTrendChart"></canvas></div>
     </div>
 
     <!-- 로그 목록 -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin:1rem 0 .6rem;flex-wrap:wrap;gap:8px">
       <span id="woCount" style="font-size:13px;color:var(--text2)"></span>
-      <button class="btn btn-danger" id="woClearBtn" style="font-size:12px">전체삭제</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary" id="woExportBtn" style="font-size:12px">📥 엑셀 내보내기</button>
+        <label class="btn btn-secondary" style="font-size:12px;cursor:pointer;margin:0">📤 가져오기
+          <input type="file" id="woImportFile" accept=".xlsx,.xls" style="display:none">
+        </label>
+        <button class="btn btn-danger" id="woClearBtn" style="font-size:12px">전체삭제</button>
+      </div>
     </div>
+    <div class="status" id="woXlsxStatus"></div>
     <div id="woLog"></div>
   </div>
 </div>
@@ -494,7 +519,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-e';
+const APP_VERSION='2026.08.31-f';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -535,6 +560,8 @@ let woEditIdx     = -1;
 let woSetRows     = [];
 let woTrendChart  = null;
 let woMetric      = 'e1rm';     // e1rm | volume | top
+let woIdxDays     = 90;         // 종합 지수 기간
+let woRangeDays   = 0;          // 그래프 기간 (0=전체)
 
 // ── Load & Migrate ─────────────────────────────────────
 function init() {
@@ -741,6 +768,25 @@ function bindAll(){
     const woExIn=document.getElementById('wo-exercise');
     woExIn.addEventListener('input',()=>syncTrendToInput());
     woExIn.addEventListener('change',()=>syncTrendToInput());
+  });
+  wire('운동기록 입출력',()=>{
+    document.getElementById('woExportBtn').addEventListener('click',exportWorkoutXlsx);
+    document.getElementById('woImportFile').addEventListener('change',e=>{
+      if(e.target.files[0]) importWorkoutXlsx(e.target.files[0]);
+      e.target.value='';
+    });
+  });
+  wire('기간 토글',()=>{
+    document.querySelectorAll('.wo-idx').forEach(b=>b.addEventListener('click',()=>{
+      woIdxDays=+b.dataset.d;
+      document.querySelectorAll('.wo-idx').forEach(x=>x.classList.toggle('active',x===b));
+      renderWoIndex();
+    }));
+    document.querySelectorAll('.wo-range').forEach(b=>b.addEventListener('click',()=>{
+      woRangeDays=+b.dataset.d;
+      document.querySelectorAll('.wo-range').forEach(x=>x.classList.toggle('active',x===b));
+      renderWoTrend();
+    }));
   });
   wire('지표 토글',()=>{
     document.querySelectorAll('.wo-metric').forEach(b=>b.addEventListener('click',()=>{
@@ -1834,6 +1880,7 @@ function renderWorkouts(){
   sel.innerHTML='<option value="">— 종목 —</option>'+exNames.map(e=>`<option value="${e}">${e}</option>`).join('');
   if(typed&&exNames.includes(typed))      sel.value=typed;   // 입력창 종목 우선
   else if(exNames.includes(prev))          sel.value=prev;
+  try{ renderWoIndex(); }catch(e){ showErr('전체 과부하 지수',e); }
   renderWoTrend();
 
   // count
@@ -1945,6 +1992,188 @@ function woDiagnose(S,bw){
 const woPct=(a,b)=>b>0?((a-b)/b*100):0;
 const woSign=v=>(v>0?'+':'')+v.toFixed(1)+'%';
 
+
+
+// ── 운동기록 엑셀 입출력 ───────────────────────────────
+function exportWorkoutXlsx(){
+  if(!workouts.length){ alert('운동 기록이 없습니다.'); return; }
+  const sorted=[...workouts].sort((a,b)=>a.date.localeCompare(b.date));
+  const rows=sorted.map(w=>{
+    const m=woMetrics(w);
+    return {
+      '날짜':w.date, '부위':w.cat||woPartOf(w.exercise), '종목':w.exercise,
+      '무게':w.weight??'', '횟수':w.reps??'', '세트':w.sets??'',
+      '세트상세':w.setDetails?w.setDetails.map(s=>`${s.weight}x${s.reps}`).join(' / '):'',
+      '총볼륨':Math.round(m.volume), 'e1RM':+m.e1rm.toFixed(1),
+      '헬스장':w.gym||'', '메모':w.memo||''
+    };
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'운동기록');
+  XLSX.writeFile(wb,`운동기록_${todayStr().replace(/\./g,'')}.xlsx`);
+  showStatus('woXlsxStatus','success',`${rows.length}건 내보냈어.`);
+}
+
+function importWorkoutXlsx(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(sheet,{header:1});
+      if(raw.length<2){ showStatus('woXlsxStatus','error','데이터가 없어.'); return; }
+      const headers=raw[0].map(h=>String(h??'').trim());
+      const ix={
+        date:headers.findIndex(h=>h.includes('날짜')),
+        cat:headers.findIndex(h=>h.includes('부위')),
+        ex:headers.findIndex(h=>h.includes('종목')),
+        weight:headers.findIndex(h=>h==='무게'),
+        reps:headers.findIndex(h=>h.includes('횟수')),
+        sets:headers.findIndex(h=>h==='세트'),
+        det:headers.findIndex(h=>h.includes('세트상세')),
+        gym:headers.findIndex(h=>h.includes('헬스장')),
+        memo:headers.findIndex(h=>h.includes('메모'))
+      };
+      if(ix.date<0||ix.ex<0){ showStatus('woXlsxStatus','error','날짜·종목 열을 못 찾았어.'); return; }
+      let added=0,updated=0;
+      raw.slice(1).forEach(row=>{
+        if(!row||!row.length) return;
+        let date=String(row[ix.date]??'').trim();
+        if(!date) return;
+        if(/^\d{4}-\d{2}-\d{2}/.test(date)){
+          const p=date.slice(0,10).split('-'); date=`${p[0].slice(2)}.${p[1]}.${p[2]}`;
+        }
+        const exercise=String(row[ix.ex]??'').trim();
+        if(!exercise) return;
+        const rec={
+          date, exercise,
+          cat: ix.cat>=0?String(row[ix.cat]??'').trim():'',
+          gym: ix.gym>=0?String(row[ix.gym]??'').trim():'',
+          memo:ix.memo>=0?String(row[ix.memo]??'').trim():'',
+          weight:ix.weight>=0?(parseFloat(row[ix.weight])||0):0,
+          reps:  ix.reps>=0?(parseInt(row[ix.reps])||0):0,
+          sets:  ix.sets>=0?(parseInt(row[ix.sets])||0):0,
+          setDetails:null
+        };
+        const dtxt=ix.det>=0?String(row[ix.det]??'').trim():'';
+        if(dtxt){
+          const dets=dtxt.split('/').map(s=>{
+            const m=s.trim().match(/([\d.]+)\s*[xX×]\s*(\d+)/);
+            return m?{weight:parseFloat(m[1]),reps:parseInt(m[2])}:null;
+          }).filter(Boolean);
+          if(dets.length){
+            rec.setDetails=dets; rec.sets=dets.length;
+            rec.weight=Math.max(...dets.map(s=>s.weight));
+            rec.reps=dets.find(s=>s.weight===rec.weight).reps;
+          }
+        }
+        const i=workouts.findIndex(w=>w.date===rec.date&&w.exercise===rec.exercise);
+        if(i>=0){ workouts[i]=rec; updated++; } else { workouts.push(rec); added++; }
+      });
+      saveWorkouts(); renderWorkouts();
+      showStatus('woXlsxStatus','success',`추가 ${added}건 · 갱신 ${updated}건`);
+    }catch(err){ showErr('운동기록 가져오기',err); showStatus('woXlsxStatus','error','읽기 실패: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── 부위 판정 ─────────────────────────────────────────
+function woPartOf(ex){
+  for(const [cat,list] of Object.entries(EX_PRESETS)) if(list.includes(ex)) return cat;
+  const w=workouts.find(w=>w.exercise===ex&&w.cat);
+  return (w&&w.cat)||'기타';
+}
+// 종목이 맨몸(중량 0)인지
+function woIsBW(S){ return S.every(s=>s.top===0); }
+
+// 특정 기간(days) 전 대비 변화율 — 기준 3세션 vs 최근 3세션
+function woWindowChange(S,days){
+  if(S.length<3) return null;
+  const key=woIsBW(S)?'totalReps':'e1rm';
+  const end=woD(S[S.length-1].date);
+  const target=new Date(end); target.setDate(target.getDate()-days);
+  // 그 기간만큼 데이터가 없으면 판정 불가 (14일 여유)
+  if((target-woD(S[0].date))/86400000 < -14) return null;
+  // 짧은 기간엔 2세션씩(3세션이면 3주를 잡아먹어 창을 넘김), 긴 기간엔 3세션씩
+  const n = (days<=35 || S.length<8) ? 2 : 3;
+  if(S.length < n*2) return null;
+  const recStart = S.length-n;                       // 최근 구간 시작 인덱스
+  const rec = S.slice(recStart);
+  // 기준 구간은 최근 구간과 인덱스가 겹치지 않는 범위에서만 고른다
+  const pool = S.slice(0,recStart).map((s,i)=>({s,i}));
+  if(pool.length < n) return null;
+  const near = pool
+    .sort((a,b)=>Math.abs(woD(a.s.date)-target)-Math.abs(woD(b.s.date)-target))
+    .slice(0,n)
+    .sort((a,b)=>a.i-b.i)
+    .map(x=>x.s);
+  const avg=a=>a.reduce((x,s)=>x+s[key],0)/a.length;
+  const b=avg(near), r=avg(rec);
+  if(!(b>0)) return null;
+  // 두 구간 사이 실제 간격이 기간의 40% 미만이면 비교 의미 없음
+  const gap=(woD(rec[0].date)-woD(near[near.length-1].date))/86400000;
+  if(gap < days*0.35) return null;
+  return {pct:(r-b)/b*100, base:b, recent:r, unit:key==='e1rm'?'kg':'회', n, gap:Math.round(gap)};
+}
+
+const WO_PERIODS=[[28,'4주'],[90,'3개월'],[180,'6개월'],[365,'1년']];
+
+// ── 부위별 · 전체 종합 과부하 지수 ──────────────────────
+function renderWoIndex(){
+  const el=document.getElementById('woIndexBody'); if(!el) return;
+  const exNames=[...new Set(workouts.map(w=>w.exercise))];
+  if(!exNames.length){ el.innerHTML='<p style="font-size:12px;color:var(--text3)">운동 기록이 쌓이면 부위별 지수가 나와.</p>'; return; }
+
+  const byPart={}, skipped=[];
+  exNames.forEach(ex=>{
+    const S=woSessions(ex);
+    const c=woWindowChange(S,woIdxDays);
+    if(!c){ skipped.push(ex); return; }
+    const p=woPartOf(ex);
+    (byPart[p]||(byPart[p]=[])).push({ex,pct:c.pct,n:S.length});
+  });
+
+  const parts=Object.keys(byPart);
+  if(!parts.length){
+    el.innerHTML=`<p style="font-size:12px;color:var(--text3)">${woIdxDays}일 전과 비교할 데이터가 아직 부족해. 더 짧은 기간을 골라보거나 기록이 더 쌓이면 나와.</p>`;
+    return;
+  }
+  // 부위 평균 → 부위끼리 동일 가중 평균 (종목 많은 부위가 지배하지 않게)
+  const partAvg={}; parts.forEach(p=>partAvg[p]=byPart[p].reduce((s,x)=>s+x.pct,0)/byPart[p].length);
+  const overall=parts.reduce((s,p)=>s+partAvg[p],0)/parts.length;
+
+  const col=v=>v>=5?'#4ade80':v>=1?'#86efac':v>-1?'#fbbf24':v>-5?'#fb923c':'#f87171';
+  const sign=v=>(v>0?'+':'')+v.toFixed(1)+'%';
+  let verdict,vc;
+  if(overall>=5){ verdict='전신 과부하 진행 중'; vc='good'; }
+  else if(overall>=1){ verdict='완만하게 진행 중'; vc='good'; }
+  else if(overall>-1){ verdict='전신 정체'; vc='info'; }
+  else { verdict='전신 하락'; vc='warn'; }
+
+  const order=['등','가슴','하체','어깨','팔','기타'];
+  const sorted=parts.sort((a,b)=>(order.indexOf(a)+99)%99-(order.indexOf(b)+99)%99);
+
+  el.innerHTML=`
+    <div class="a-card ${vc}" style="margin-bottom:.6rem;padding:.75rem .9rem">
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+        <span style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:${col(overall)}">${sign(overall)}</span>
+        <span style="font-size:13px;font-weight:500">${verdict}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${WO_PERIODS.find(p=>p[0]===woIdxDays)?.[1]||woIdxDays+'일'} 전 대비 · 부위 ${parts.length}개 · 종목 ${parts.reduce((s,p)=>s+byPart[p].length,0)}개</div>
+    </div>
+    <table class="wk-table"><tbody>
+    ${sorted.map(p=>`
+      <tr><td style="text-align:left;font-weight:500">${p}<span style="color:var(--text3);font-weight:400"> (${byPart[p].length})</span></td>
+          <td style="color:${col(partAvg[p])};font-weight:600">${sign(partAvg[p])}</td></tr>
+      ${byPart[p].sort((a,b)=>b.pct-a.pct).map(x=>`
+      <tr><td style="text-align:left;padding-left:14px;color:var(--text3);font-size:11px">${x.ex}</td>
+          <td style="color:${col(x.pct)};font-size:11px">${sign(x.pct)}</td></tr>`).join('')}
+    `).join('')}
+    </tbody></table>
+    ${skipped.length?`<div style="font-size:10.5px;color:var(--text3);margin-top:6px">판정 제외 ${skipped.length}종목 (기간 내 비교 데이터 부족): ${skipped.slice(0,6).join(', ')}${skipped.length>6?' 외':''}</div>`:''}
+    <div style="font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.5">종목별 e1RM(맨몸은 총 횟수)의 최근 2~3세션 평균을 ${woIdxDays}일 전 같은 수의 세션과 비교. 부위 평균을 낸 뒤 부위끼리 동일 가중으로 합산해서, 종목 수가 많은 부위가 전체를 좌우하지 않게 했어.</div>`;
+}
+
 function renderWoTrend(){
   try{ renderWoTrendInner(); }
   catch(e){
@@ -2010,15 +2239,57 @@ function renderWoTrendInner(){
       </div></div>`;
   }
 
+  // ── 기간별 변화 표 ──
+  const rows=WO_PERIODS.map(([d,label])=>{
+    const c=woWindowChange(S,d);
+    return {label,d,c};
+  });
+  const anyRow=rows.some(r=>r.c);
+  const pcol=v=>v>=5?'#4ade80':v>=1?'#86efac':v>-1?'#fbbf24':v>-5?'#fb923c':'#f87171';
+  const periodTable=anyRow?`<table class="wk-table" style="margin-bottom:.6rem"><tbody>
+    ${rows.map(r=>`<tr>
+      <td style="text-align:left;color:var(--text2)">${r.label} 전 대비</td>
+      <td style="${r.c?`color:${pcol(r.c.pct)};font-weight:600`:'color:var(--text3)'}">${r.c?((r.c.pct>0?'+':'')+r.c.pct.toFixed(1)+'%'):'—'}</td>
+      <td style="color:var(--text3);font-size:10.5px">${r.c?`${woNum(r.c.base)} → ${woNum(r.c.recent)}${r.c.unit}`:'데이터 부족'}</td>
+    </tr>`).join('')}
+  </tbody></table>
+  <div style="font-size:10.5px;color:var(--text3);margin:-.3rem 0 .5rem;line-height:1.5">단기와 장기가 갈릴 때가 정보야. 4주 정체 + 6개월 상승이면 정상적인 정체 구간이고, 둘 다 정체면 프로그램을 바꿀 때야.</div>`:'';
+
   const L=S[S.length-1];
   const detail = bw
     ? `${L.totalReps}회 / ${L.sets}세트`
     : `탑세트 ${L.top}kg × ${L.topReps}회 · 볼륨 ${woNum(L.volume)}kg · e1RM ${L.e1rm.toFixed(1)}kg`;
-  sum.innerHTML=`${diagCard}${cards}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
+  sum.innerHTML=`${diagCard}${periodTable}${cards}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
     최근 세션 <b style="color:var(--text)">${L.date}</b> — <span style="font-family:'DM Mono',monospace">${detail}</span> · 총 ${S.length}세션</div>`;
 
-  // ── 차트: 지표 + 3회 이동평균 + 최고기록 기준선 ──
-  const mv=vals.map((_,i)=>{ const w=vals.slice(Math.max(0,i-2),i+1); return w.reduce((a,b)=>a+b,0)/w.length; });
+  // ── 차트: 기간 필터 + 장기 구간은 주간 평균으로 집계 ──
+  let CS=S;
+  if(woRangeDays>0){
+    const end=woD(S[S.length-1].date);
+    const from=new Date(end); from.setDate(from.getDate()-woRangeDays);
+    const f=S.filter(s=>woD(s.date)>=from);
+    if(f.length>=2) CS=f;
+  }
+  const spanDays=CS.length>1?woDays(CS[0].date,CS[CS.length-1].date):0;
+  const weekly=spanDays>120;
+  let labels,cvals;
+  if(weekly){
+    const buckets={};
+    CS.forEach(s=>{
+      const d=woD(s.date);
+      const wk=new Date(d); wk.setDate(wk.getDate()-wk.getDay());
+      const k=`${String(wk.getFullYear()).slice(-2)}.${String(wk.getMonth()+1).padStart(2,'0')}.${String(wk.getDate()).padStart(2,'0')}`;
+      (buckets[k]||(buckets[k]=[])).push(s[key]);
+    });
+    const ks=Object.keys(buckets).sort();
+    labels=ks.map(k=>k.slice(3).replace('.','/'));
+    cvals=ks.map(k=>buckets[k].reduce((a,b)=>a+b,0)/buckets[k].length);
+  }else{
+    labels=CS.map(s=>s.date.slice(3).replace('.','/'));
+    cvals=CS.map(s=>s[key]);
+  }
+  const cBest=Math.max(...cvals), cBestIdx=cvals.lastIndexOf(cBest);
+  const mv=cvals.map((_,i)=>{ const w=cvals.slice(Math.max(0,i-2),i+1); return w.reduce((a,b)=>a+b,0)/w.length; });
   const ctx=document.getElementById('woTrendChart');
   if(typeof Chart==='undefined'){ 
     sum.innerHTML+='<p style="font-size:11px;color:#fbbf24;margin-top:.4rem">그래프 라이브러리(Chart.js)를 못 불러왔어 — 오프라인이거나 캐시 문제. 판정 수치는 위에 정상 표시됨.</p>';
@@ -2027,16 +2298,16 @@ function renderWoTrendInner(){
   woTrendChart=new Chart(ctx,{
     type:'line',
     data:{
-      labels:S.map(s=>s.date.slice(3).replace('.','/')),
+      labels:labels,
       datasets:[
-        { label:label, data:vals, borderColor:'#4ade80', backgroundColor:'rgba(74,222,128,0.10)',
+        { label:label+(weekly?' (주평균)':''), data:cvals, borderColor:'#4ade80', backgroundColor:'rgba(74,222,128,0.10)',
           borderWidth:2, tension:.25, fill:true, order:1,
-          pointRadius:c=>c.dataIndex===bestIdx?5:3,
-          pointBackgroundColor:c=>c.dataIndex===bestIdx?'#fbbf24':'#4ade80',
-          pointBorderColor:c=>c.dataIndex===bestIdx?'#fbbf24':'#4ade80' },
-        { label:'3회 이동평균', data:mv, borderColor:'#60a5fa', borderWidth:1.5,
+          pointRadius:c=>c.dataIndex===cBestIdx?5:(weekly?2:3),
+          pointBackgroundColor:c=>c.dataIndex===cBestIdx?'#fbbf24':'#4ade80',
+          pointBorderColor:c=>c.dataIndex===cBestIdx?'#fbbf24':'#4ade80' },
+        { label:weekly?'3주 이동평균':'3회 이동평균', data:mv, borderColor:'#60a5fa', borderWidth:1.5,
           borderDash:[5,4], pointRadius:0, tension:.35, fill:false, order:2 },
-        { label:'역대 최고', data:vals.map(()=>best), borderColor:'rgba(251,191,36,0.45)',
+        { label:'역대 최고', data:cvals.map(()=>best), borderColor:'rgba(251,191,36,0.45)',
           borderWidth:1, borderDash:[2,4], pointRadius:0, fill:false, order:3 }
       ]
     },
@@ -2045,9 +2316,9 @@ function renderWoTrendInner(){
       plugins:{
         legend:{display:true,position:'bottom',labels:{color:'#888',boxWidth:10,boxHeight:2,font:{size:10},padding:10,usePointStyle:false}},
         tooltip:{callbacks:{
-          title:c=>S[c[0].dataIndex].date,
+          title:c=>weekly?labels[c[0].dataIndex]+' 주':CS[c[0].dataIndex].date,
           label:c=>c.datasetIndex===0?`${label} ${woNum(c.parsed.y)}${unit}`:`${c.dataset.label} ${woNum(c.parsed.y)}${unit}`,
-          afterBody:c=>{ const d=S[c[0].dataIndex];
+          afterBody:c=>{ if(weekly) return []; const d=CS[c[0].dataIndex];
             return bw?[`${d.totalReps}회 / ${d.sets}세트`]:[`탑세트 ${d.top}kg × ${d.topReps}회 / ${d.sets}세트`]; }
         }}
       },
