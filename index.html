@@ -542,7 +542,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-j';
+const APP_VERSION='2026.08.31-k';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -2150,6 +2150,15 @@ const DEFAULT_PART_W={'등':30,'어깨':25,'가슴':20,'하체':20,'팔':5,'기�
 const REST_HOURS=48;              // 같은 부위 회복 간격
 const SETS_PER_PART_MIN=10;       // 주당 부위별 권장 하한
 const SETS_PER_PART_MAX=20;       // 상한
+const STALE_FROM=4;               // 방치 가점 시작일
+const STALE_RATE=2;               // 가점 계수
+const STALE_CAP=40;               // 가점 상한
+// 받침 유무에 따라 조사를 고른다 (등이 / 하체가)
+function koSub(word){
+  const c=word.charCodeAt(word.length-1);
+  if(c<0xAC00||c>0xD7A3) return word+'이';
+  return word + (((c-0xAC00)%28)?'이':'가');
+}
 
 function loadRecCfg(){
   let c={};
@@ -2216,11 +2225,22 @@ function renderWoRec(){
   const hoursSince=p=>st[p].last? (now-st[p].last)/3600000 : 9999;
 
   // 후보: 제외 아님 + 회복 간격 지남
-  const cands=active.map(p=>({
-    p, gap: share[p]-tgt[p], share:share[p], tgt:tgt[p],
-    h: hoursSince(p), rest: hoursSince(p)>=REST_HOURS,
-    days: st[p].last? Math.floor((now-st[p].last)/86400000) : null
-  })).sort((a,b)=>a.gap-b.gap);
+  // 순위는 볼륨 갭이 기본이지만, 오래 방치된 부위엔 가점을 준다.
+  // 부위별 주 2회 자극이 주 1회보다 근비대에 유리하므로 빈도가 볼륨 배분보다 우선하는 구간이 있다.
+  // 4일까지는 가점 없음(회복 구간) → 그 뒤로 가속 → 9~10일이면 사실상 순위를 뒤집는다.
+  const staleBonus=d=>{
+    if(d==null) return STALE_CAP;                 // 기록 없는 부위는 최우선
+    const over=Math.max(0,d-STALE_FROM);
+    return Math.min(STALE_CAP, Math.pow(over,1.5)*STALE_RATE);
+  };
+  const cands=active.map(p=>{
+    const days = st[p].last? Math.floor((now-st[p].last)/86400000) : null;
+    const gap  = share[p]-tgt[p];
+    const bonus= staleBonus(days);
+    return { p, gap, share:share[p], tgt:tgt[p],
+             h: hoursSince(p), rest: hoursSince(p)>=REST_HOURS,
+             days, bonus, score: gap-bonus };
+  }).sort((a,b)=>a.score-b.score);
 
   const ready=cands.filter(c=>c.rest);
   const resting=cands.filter(c=>!c.rest);
@@ -2273,12 +2293,17 @@ function renderWoRec(){
         14일 비중 ${pick.share.toFixed(0)}% (목표 ${pick.tgt.toFixed(0)}%) · 갭 <b style="color:#4ade80">${sign(pick.gap)}</b>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:4px">주 평균 ${perPart[pick.p].actual}세트 / 목표 ${perPart[pick.p].target}세트 <span style="font-size:10px">(최근 14일 페이스를 주 단위로 환산)</span></div>
+      ${(()=>{
+        const gapTop=cands.filter(c=>c.rest).sort((a,b)=>a.gap-b.gap)[0];
+        if(!gapTop||gapTop.p===pick.p||pick.bonus<2) return '';
+        return `<div style="font-size:11px;color:#60a5fa;margin-top:3px">${pick.days}일 방치 가점 ${pick.bonus.toFixed(0)}점으로 순위가 바뀌었어 — 볼륨 갭만으로는 ${koSub(gapTop.p)} 1순위</div>`;
+      })()}
       ${alt?`<div style="font-size:11.5px;color:var(--text2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border)">대안: <b>${alt.p}</b> (${alt.share.toFixed(0)}% / 목표 ${alt.tgt.toFixed(0)}%)</div>`:''}
       <div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.55">${splitNote}</div>
     </div>`:`<div class="a-card info" style="margin-bottom:.6rem"><div style="font-size:12.5px">추천 가능한 부위가 없어 — 모든 부위가 ${REST_HOURS}시간 회복 구간이야. 오늘은 쉬거나 유산소/코어로 가.</div></div>`}
 
     ${relOnly.length?`<div class="a-card info" style="margin-bottom:.6rem;padding:.7rem .9rem">
-      <div style="font-size:12px;color:var(--text2);line-height:1.55">${relOnly.map(c=>c.p).join(', ')} 쪽은 <b>비중만 높고 절대량은 부족</b>해 (주 평균 ${relOnly.map(c=>perPart[c.p].actual).join('/')}세트, 권장 ${SETS_PER_PART_MIN}세트 이상). 줄일 게 아니라 전체 볼륨이 적은 상태야.</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.55">${relOnly.map(c=>c.p).join('·')} 쪽은 <b>비중만 높고 절대량은 부족</b>해 (주 평균 ${relOnly.map(c=>perPart[c.p].actual).join('/')}세트, 권장 ${SETS_PER_PART_MIN}세트 이상). 줄일 게 아니라 전체 볼륨이 적은 상태야.</div>
     </div>`:''}
     ${over.length?`<div class="a-card warn" style="margin-bottom:.6rem;padding:.7rem .9rem">
       <div style="font-size:12.5px;font-weight:600;margin-bottom:4px">⚠ 목표 초과 중</div>
@@ -2287,7 +2312,7 @@ function renderWoRec(){
     </div>`:''}
 
     <table class="wk-table"><thead><tr>
-      <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주평균<br>세트</th><th>마지막</th>
+      <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주평균<br>세트</th><th>마지막</th><th>순위<br>점수</th>
     </tr></thead><tbody>
     ${cands.map(c=>`<tr>
       <td style="text-align:left;font-weight:500">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
@@ -2295,16 +2320,19 @@ function renderWoRec(){
       <td style="color:var(--text3)">${c.tgt.toFixed(0)}%</td>
       <td style="color:${col(c.gap)};font-weight:600">${sign(c.gap)}</td>
       <td style="color:${perPart[c.p].actual<SETS_PER_PART_MIN?'#fbbf24':perPart[c.p].actual>SETS_PER_PART_MAX?'#fb923c':'var(--text2)'}">${perPart[c.p].actual}</td>
-      <td style="color:var(--text3);font-size:10.5px">${c.days!=null?c.days+'일':'—'}</td>
+      <td style="color:${c.days!=null&&c.days>=7?'#fbbf24':'var(--text3)'};font-size:10.5px">${c.days!=null?c.days+'일':'—'}${c.days!=null&&c.days>=7?' ⚠':''}</td>
+      <td style="color:var(--text3);font-size:10.5px">${c.score.toFixed(0)}</td>
     </tr>`).join('')}
-    ${excl.map(p=>`<tr><td style="text-align:left;color:#6b6b70">${p}<span style="font-size:9.5px"> 제외</span></td><td colspan="5" style="color:#6b6b70;font-size:10.5px">추천에서 제외 — 가중치는 나머지 부위에 재분배</td></tr>`).join('')}
+    ${excl.map(p=>`<tr><td style="text-align:left;color:#6b6b70">${p}<span style="font-size:9.5px"> 제외</span></td><td colspan="6" style="color:#6b6b70;font-size:10.5px">추천에서 제외 — 가중치는 나머지 부위에 재분배</td></tr>`).join('')}
     </tbody></table>
 
     <div style="font-size:11px;color:var(--text2);margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);line-height:1.6">
       <b>주 평균 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${recCfg.freq}회 × 12세트)
       ${weeklyTotal>weeklyTargetTotal*1.25?'<br><span style="color:#fb923c">목표보다 25% 이상 많아 — 회복이 안 따라오면 디로드 시점이야.</span>':''}
       ${weeklyTotal<weeklyTargetTotal*0.7?'<br><span style="color:#fbbf24">목표보다 30% 이상 적어 — 자극이 부족할 수 있어.</span>':''}
-      <br><span style="color:var(--text3);font-size:10.5px">부위별 주 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.<br>모든 '주' 수치는 달력 주(월~일)가 아니라 <b>최근 14일 페이스를 7일로 환산</b>한 값이야. 주 초반에 항상 부족하게 나오는 걸 피하려고 이렇게 했어.</span>
+      ${cands.filter(c=>c.days!=null&&c.days>=7).length?`<br><span style="color:#fbbf24">${cands.filter(c=>c.days>=7).map(c=>`${c.p} ${c.days}일`).join(', ')} 방치 중 — 주 2회 자극이 주 1회보다 유리해서 순위 가점이 들어가 있어.</span>`:''}
+      <br><span style="color:var(--text3);font-size:10.5px">순위 점수 = 볼륨 갭 − 방치 가점. 낮을수록 우선. 가점은 ${STALE_FROM}일까지 0이고 그 뒤로 가속해서, 9~10일 방치되면 갭 차이를 뒤집어.
+      <br>부위별 주 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.<br>모든 '주' 수치는 달력 주(월~일)가 아니라 <b>최근 14일 페이스를 7일로 환산</b>한 값이야. 주 초반에 항상 부족하게 나오는 걸 피하려고 이렇게 했어.</span>
     </div>`;
 
   renderWoWeightCfg();
