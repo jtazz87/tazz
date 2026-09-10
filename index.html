@@ -542,7 +542,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.08.31-l';
+const APP_VERSION='2026.09.10-b';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -914,12 +914,29 @@ function renderToggles(){
 function setGym(gym, ctx){
   curGym=gym; renderToggles();
   if(ctx==='history'){ renderHistory(); return; }
-  renderMonthlyTrend(); renderCharts();
+  renderMonthlyTrend(); renderCharts(); renderTriggerBanner(); invalidateAnalysis();
 }
 function setGoal(goal, ctx){
   curGoal=goal; renderToggles();
   if(ctx==='history'){ renderHistory(); return; }
-  renderMonthlyTrend(); renderCharts();
+  renderMonthlyTrend(); renderCharts(); renderTriggerBanner(); invalidateAnalysis();
+}
+
+// 필터가 바뀌면 이전 분석 결과는 더 이상 유효하지 않다.
+// 그대로 남겨두면 판정 카드가 필터를 반영하지 않는 것처럼 보인다.
+function invalidateAnalysis(){
+  const el=document.getElementById('analysisResult');
+  if(!el||!el.innerHTML.trim()) return;
+  const label=(curGym!=='all'?curGym:'전체')+(curGoal!=='all'?' · '+goalLabel(curGoal):'');
+  el.innerHTML=`<div class="a-card info" style="padding:.8rem .9rem">
+    <div style="font-size:12.5px;font-weight:500;margin-bottom:4px">필터가 <b>${label}</b>(으)로 바뀌었어</div>
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.55">이전 분석 결과는 다른 필터 기준이라 지웠어. 위 <b>분석 실행</b>을 다시 눌러줘.</div>
+    <button class="btn btn-secondary" id="reRunBtn" style="font-size:11.5px;padding:5px 12px;margin-top:8px">지금 다시 분석</button>
+  </div>`;
+  const b=document.getElementById('reRunBtn');
+  if(b) b.onclick=()=>runAnalysis();
+  document.getElementById('analysisStatus').className='status';
+  document.getElementById('analysisStatus').textContent='';
 }
 
 function addGym(){
@@ -2148,11 +2165,11 @@ function importWorkoutXlsx(file){
 // 톤수로 세면 하체가 항상 이겨서 둘 다 왜곡이 생긴다.
 // 근비대 문헌 표준도 주당 세트 수(부위별 10~20세트)라 절대 기준과 비교도 된다.
 // 메인 = 세션을 통째로 배정하는 부위 / 보조 = 메인 뒤에 붙이는 부위
-const MAIN_PARTS=['등(넓이)','등(폭)','가슴','하체'];
+const MAIN_PARTS=['등(넓이)','등(두께)','가슴','하체'];
 const AUX_PARTS =['어깨(측면)','어깨(후면)','어깨(전면)','팔(이두)','팔(삼두)'];
 const PART_ORDER=[...MAIN_PARTS,...AUX_PARTS,'기타'];
 const DEFAULT_PART_W={
-  '등(넓이)':25,'등(폭)':20,'가슴':20,'하체':15,
+  '등(넓이)':25,'등(두께)':20,'가슴':20,'하체':15,
   '어깨(측면)':8,'어깨(후면)':5,'어깨(전면)':3,'팔(이두)':2,'팔(삼두)':2,'기타':0
 };
 
@@ -2161,7 +2178,7 @@ const DEFAULT_PART_W={
 const SUB_RULES=[
   ['하체',      /레그|스쿼트|힙|카프|타이|런지|데드리프트|둔근|햄스트링/],
   ['등(넓이)',  /랫풀|랫 ?머신|풀업|친업|풀오버|풀 ?다운/],
-  ['등(폭)',    /로우|로우로우|시티드 ?케이블|체스트 ?서포티드|슈러그|후면 ?등/],
+  ['등(두께)',    /로우|로우로우|시티드 ?케이블|체스트 ?서포티드|슈러그|후면 ?등/],
   ['어깨(측면)',/사이드 ?레터럴|레터럴 ?레이즈|측면|사레레/],
   ['어깨(후면)',/리어 ?델트|리어|페이스 ?풀|후면 ?델트|비하인드/],
   ['어깨(전면)',/숄더 ?프레스|오버헤드 ?프레스|프론트 ?레이즈|아놀드|밀리터리/],
@@ -2176,7 +2193,7 @@ function woSubPart(ex){
   // 규칙에 안 걸리면 기록에 저장된 대분류로 대충 배정
   const w=workouts.find(x=>x.exercise===ex&&x.cat);
   const cat=w&&w.cat;
-  if(cat==='등')   return '등(폭)';
+  if(cat==='등')   return '등(두께)';
   if(cat==='어깨') return '어깨(측면)';
   if(cat==='팔')   return '팔(이두)';
   if(cat==='가슴'||cat==='하체') return cat;
@@ -2298,7 +2315,7 @@ function renderWoRec(){
   // 같은 세션에 넣는 게 회복 부담이 가장 적다.
   const PAIR={
     '등(넓이)':['팔(이두)','어깨(후면)'],
-    '등(폭)'  :['어깨(후면)','팔(이두)'],
+    '등(두께)'  :['어깨(후면)','팔(이두)'],
     '가슴'    :['어깨(전면)','팔(삼두)'],
     '하체'    :['기타']
   };
@@ -2312,13 +2329,18 @@ function renderWoRec(){
     combo=combo.slice(0,2);
   }
   const perSession=Math.round(weeklyTargetTotal/recCfg.freq);
+
+  // 모든 메인 부위가 목표를 넘었는지 / 총량이 과다한지
+  const allMainOver = readyMain.length>0 && readyMain.every(c=>c.gap>=0);
+  const volOver     = weeklyTotal > weeklyTargetTotal*1.2;
+  const noDeficit   = allMainOver || volOver;
   let splitNote='';
   if(pick){
     if(combo.length){
-      const mainSets=Math.max(6,perSession-combo.length*3);
+      const mainSets=noDeficit?4:Math.max(6,perSession-combo.length*3);
       splitNote=`<b>${pick.p} ${mainSets}세트 + ${combo.map(c=>`${c} 3세트`).join(' + ')}</b> 한 세션 구성. ${combo.join('·')}만 따로 하루 빼지 않아도 목표 비중이 채워져.`;
     }else{
-      splitNote=`${pick.p} 단독 ${perSession}세트. 붙일 만한 보조 부위가 지금은 다 회복 구간이야.`;
+      splitNote=`${pick.p} ${noDeficit?'4세트로 가볍게':'단독 '+perSession+'세트'}. 붙일 만한 보조 부위가 지금은 다 회복 구간이야.`;
     }
     if(recCfg.freq<=3) splitNote+=`<br>· 주 ${recCfg.freq}회면 세션당 부위를 2개씩 묶어야 5개 부위가 한 바퀴 돌아.`;
   }
@@ -2327,13 +2349,29 @@ function renderWoRec(){
   const col=v=>v<=-5?'#4ade80':v<5?'#fbbf24':'#f87171';
 
   el.innerHTML=`
-    ${pick?`<div class="a-card good" style="margin-bottom:.6rem;padding:.8rem .9rem">
+    ${noDeficit?`<div class="a-card warn" style="margin-bottom:.6rem;padding:.8rem .9rem">
+      <div style="font-size:14px;font-weight:600;margin-bottom:5px">🛑 지금은 추가할 부위가 없어</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">
+        ${allMainOver?`메인 부위 ${readyMain.length}개가 전부 목표 비중을 넘었어.`:''}
+        ${volOver?`주 평균 총량 ${weeklyTotal.toFixed(0)}세트가 목표 ${weeklyTargetTotal}세트를 ${Math.round((weeklyTotal/weeklyTargetTotal-1)*100)}% 초과했어.`:''}
+      </div>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border);line-height:1.6">
+        필요한 건 부위 추가가 아니라 <b>총량 감축</b>이야. 초과 부위에서 세트를 덜어내고,
+        ${(()=>{
+          const st=cands.filter(c=>AUX_PARTS.includes(c.p)&&(c.days==null||c.days>=7));
+          return st.length?`방치된 보조 부위(${st.map(c=>`${c.p}${c.days!=null?' '+c.days+'일':' 기록없음'}`).join(', ')})만 3세트씩 채우는 정도로 가.`
+                          :'보조 부위도 다 최근에 했으니 오늘은 쉬는 게 나아.';
+        })()}
+      </div>
+    </div>`:''}
+    ${pick?`<div class="a-card ${noDeficit?'info':'good'}" style="margin-bottom:.6rem;padding:.8rem .9rem">
+      ${noDeficit?'<div style="font-size:11px;color:var(--text3);margin-bottom:4px">굳이 한다면 (전 부위 목표 충족 상태)</div>':''}
       <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
         <span style="font-size:22px;font-weight:700">${pick.p}</span>
         <span style="font-size:11.5px;color:var(--text3)">${pick.days!=null?`${pick.days}일 전 수행`:'기록 없음'}</span>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:5px;font-family:'DM Mono',monospace">
-        14일 비중 ${pick.share.toFixed(0)}% (목표 ${pick.tgt.toFixed(0)}%) · 갭 <b style="color:#4ade80">${sign(pick.gap)}</b>
+        14일 비중 ${pick.share.toFixed(0)}% (목표 ${pick.tgt.toFixed(0)}%) · 갭 <b style="color:${col(pick.gap)}">${sign(pick.gap)}</b>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:4px">주 평균 ${perPart[pick.p].actual}세트 / 목표 ${perPart[pick.p].target}세트 <span style="font-size:10px">(최근 14일 페이스를 주 단위로 환산)</span></div>
       ${(()=>{
