@@ -381,7 +381,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <!-- 부위 추천 -->
     <div class="card">
       <div class="card-label">🎯 오늘 추천 부위</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.7rem;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem;flex-wrap:wrap">
+        <span style="font-size:11.5px;color:var(--text3);width:46px">휴무일</span>
+        <div id="woRestRow" style="display:flex;gap:3px">
+          <button type="button" class="g-btn wo-rest" data-d="0" style="font-size:11px;padding:4px 9px">일</button>
+          <button type="button" class="g-btn wo-rest" data-d="1" style="font-size:11px;padding:4px 9px">월</button>
+          <button type="button" class="g-btn wo-rest" data-d="2" style="font-size:11px;padding:4px 9px">화</button>
+          <button type="button" class="g-btn wo-rest" data-d="3" style="font-size:11px;padding:4px 9px">수</button>
+          <button type="button" class="g-btn wo-rest" data-d="4" style="font-size:11px;padding:4px 9px">목</button>
+          <button type="button" class="g-btn wo-rest" data-d="5" style="font-size:11px;padding:4px 9px">금</button>
+          <button type="button" class="g-btn wo-rest" data-d="6" style="font-size:11px;padding:4px 9px">토</button>
+        </div>
+      </div>
+      <div id="woPlanBody" style="margin-bottom:.7rem"></div>
+      <div style="display:none;align-items:center;gap:8px;margin-bottom:.7rem;flex-wrap:wrap">
         <span style="font-size:11.5px;color:var(--text3)">주 훈련 횟수</span>
         <div id="woFreqRow" style="display:flex;gap:4px">
           <button type="button" class="g-btn wo-freq" data-f="2" style="font-size:11px;padding:4px 10px">2회</button>
@@ -542,7 +555,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.10-b';
+const APP_VERSION='2026.09.10-d';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -589,6 +602,8 @@ let subOverride   = {};         // 종목별 세부부위 수동 지정
 let trainLevel    = '중급';      // 훈련 연차 (속도 벤치마크용)
 let woIdxDays     = 90;         // 종합 지수 기간
 let woRangeDays   = 0;          // 그래프 기간 (0=전체)
+let woLogShow     = 10;         // 기록 목록에 보여줄 날짜 수
+let woLogOpen     = false;      // 기록 목록 펼침 여부 (기본 접힘)
 
 // ── Load & Migrate ─────────────────────────────────────
 function init() {
@@ -807,9 +822,13 @@ function bindAll(){
       e.target.value='';
     });
   });
-  wire('주 훈련 횟수',()=>{
-    document.querySelectorAll('.wo-freq').forEach(b=>b.addEventListener('click',()=>{
-      recCfg.freq=+b.dataset.f; saveRecCfg(recCfg); renderWoRec();
+  wire('휴무일 설정',()=>{
+    document.querySelectorAll('.wo-rest').forEach(b=>b.addEventListener('click',()=>{
+      const d=+b.dataset.d;
+      const r=recCfg.rest||[];
+      recCfg.rest = r.includes(d) ? r.filter(x=>x!==d) : [...r,d].sort();
+      if(recCfg.rest.length>=6) recCfg.rest=r;   // 훈련일 2일 미만은 막음
+      saveRecCfg(recCfg); renderWoRec();
     }));
   });
   wire('훈련 연차',()=>{
@@ -1963,7 +1982,8 @@ function renderWorkouts(){
   const byDate={};
   workouts.forEach((w,i)=>{ (byDate[w.date]=byDate[w.date]||[]).push({w,i}); });
   const dates=Object.keys(byDate).sort().reverse();
-  box.innerHTML=dates.map(d=>{
+  const shown=dates.slice(0,woLogShow);
+  const cards=shown.map(d=>{
     const rows=byDate[d].map(({w,i})=>`
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
         <div style="flex:1;min-width:0">
@@ -1978,6 +1998,23 @@ function renderWorkouts(){
       </div>`).join('');
     return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:500">${d}</span><span style="font-size:11px;color:var(--text3)">${byDate[d][0].w.gym||''}</span></div>${rows}</div>`;
   }).join('');
+
+  const more=dates.length-shown.length;
+  box.innerHTML=`<details id="woLogDetails"${woLogOpen?' open':''}>
+      <summary style="font-size:12px;color:var(--text2);cursor:pointer;padding:6px 0">과거 운동 기록 ${dates.length}일 · ${workouts.length}건 ${woLogOpen?'접기':'펼치기'}</summary>
+      <div style="margin-top:.5rem">
+        ${cards}
+        ${more>0?`<button class="btn btn-secondary" id="woMoreBtn" style="font-size:11.5px;padding:6px 14px;width:100%">이전 ${Math.min(10,more)}일 더 보기 (남은 ${more}일)</button>`:''}
+      </div>
+    </details>`;
+  const det=document.getElementById('woLogDetails');
+  if(det) det.addEventListener('toggle',()=>{
+    woLogOpen=det.open;
+    if(!det.open) woLogShow=10;      // 접으면 다시 10일로 초기화
+    renderWorkouts();
+  });
+  const mb=document.getElementById('woMoreBtn');
+  if(mb) mb.onclick=()=>{ woLogShow+=10; renderWorkouts(); };
 }
 
 // ── 점진적 과부하 계산 ─────────────────────────────────
@@ -2218,6 +2255,7 @@ function loadRecCfg(){
   return {
     weights: Object.assign({}, DEFAULT_PART_W, c.weights||{}),
     excluded: c.excluded||[],
+    rest: c.rest||[3,0],          // 기본 수·일 휴무
     freq: c.freq||4
   };
 }
@@ -2244,6 +2282,97 @@ function woPartStats(days){
   return st;
 }
 
+
+// ── 휴무일 · 분할 계획 ──────────────────────────────────
+const WD=['일','월','화','수','목','금','토'];
+
+// 훈련 요일에 메인 부위를 배정한다.
+// 가중치 비례로 세션 수를 나누고, 같은 부위가 연속되지 않게 배치해서 회복 간격을 확보한다.
+function buildSplitPlan(tgt, excl){
+  const rest=recCfg.rest||[];
+  const trainDays=[0,1,2,3,4,5,6].filter(d=>!rest.includes(d));
+  const mains=MAIN_PARTS.filter(p=>!excl.includes(p)&&tgt[p]>0);
+  if(!trainDays.length||!mains.length) return {trainDays,rest,slots:[],plan:{},mains};
+
+  // 가중치 비례 배정 (최대 잉여법), 메인은 최소 1회 보장
+  const wsum=mains.reduce((s,p)=>s+tgt[p],0);
+  const exact={}, base={};
+  let used=0;
+  mains.forEach(p=>{ exact[p]=tgt[p]/wsum*trainDays.length; base[p]=Math.max(1,Math.floor(exact[p])); used+=base[p]; });
+  // 최소 1회 보장으로 초과했으면 큰 쪽부터 깎음
+  while(used>trainDays.length){
+    const p=mains.slice().sort((a,b)=>base[b]-base[a])[0];
+    if(base[p]<=1) break; base[p]--; used--;
+  }
+  // 남은 자리는 잉여가 큰 순으로
+  while(used<trainDays.length){
+    const p=mains.slice().sort((a,b)=>(exact[b]-base[b])-(exact[a]-base[a]))[0];
+    base[p]++; used++;
+  }
+  // 같은 부위가 붙지 않게 배치
+  const remain={...base}; const slots=[];
+  for(let i=0;i<trainDays.length;i++){
+    const avail=mains.filter(p=>remain[p]>0);
+    if(!avail.length) break;
+    const prev=slots[slots.length-1];
+    let cand=avail.filter(p=>p!==prev);
+    if(!cand.length) cand=avail;
+    cand.sort((a,b)=>remain[b]-remain[a]);
+    slots.push(cand[0]); remain[cand[0]]--;
+  }
+  const plan={}; trainDays.forEach((d,i)=>plan[d]=slots[i]);
+  return {trainDays,rest,slots,plan,mains,base};
+}
+
+// 같은 부위가 며칠 간격으로 반복되는지 검증
+function planSpacing(plan,trainDays){
+  const byPart={};
+  trainDays.forEach(d=>{ const p=plan[d]; if(p) (byPart[p]||(byPart[p]=[])).push(d); });
+  const out=[];
+  Object.entries(byPart).forEach(([p,days])=>{
+    if(days.length<2) return;
+    let min=99;
+    for(let i=0;i<days.length;i++){
+      const a=days[i], b=days[(i+1)%days.length];
+      const gap=(b-a+7)%7 || 7;
+      if(gap<min) min=gap;
+    }
+    out.push({p,count:days.length,minGap:min});
+  });
+  return out;
+}
+
+function renderWoPlan(tgt,excl){
+  const el=document.getElementById('woPlanBody'); if(!el) return null;
+  const rest=recCfg.rest||[];
+  document.querySelectorAll('.wo-rest').forEach(b=>b.classList.toggle('active',rest.includes(+b.dataset.d)));
+  const P=buildSplitPlan(tgt,excl);
+  const todayD=new Date().getDay();
+  const isRest=rest.includes(todayD);
+  const nDiv=P.mains.length;
+  const sp=planSpacing(P.plan,P.trainDays);
+  const tight=sp.filter(x=>x.minGap<2);
+
+  el.innerHTML=`
+    <div style="display:flex;gap:3px;margin-bottom:.45rem">
+      ${[0,1,2,3,4,5,6].map(d=>{
+        const r=rest.includes(d), p=P.plan[d], t=d===todayD;
+        return `<div style="flex:1;text-align:center;padding:5px 2px;border-radius:6px;
+          background:${t?'rgba(74,222,128,0.14)':'var(--bg3)'};
+          border:1px solid ${t?'rgba(74,222,128,0.5)':'transparent'}">
+          <div style="font-size:10.5px;color:${r?'var(--text3)':'var(--text2)'};font-weight:${t?'700':'400'}">${WD[d]}</div>
+          <div style="font-size:9px;color:${r?'#6b6b70':'var(--text)'};margin-top:2px;line-height:1.25;word-break:keep-all">${r?'휴무':(p||'—').replace('등(','').replace(')','')}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:10.5px;color:var(--text3);line-height:1.55">
+      주 ${P.trainDays.length}회 · ${nDiv}분할 (${P.mains.map(p=>`${p} ${P.base[p]}회`).join(' · ')})
+      ${tight.length?`<br><span style="color:#fbbf24">⚠ ${tight.map(x=>`${x.p} 간격 ${x.minGap}일`).join(', ')} — 48시간 회복에 못 미쳐. 휴무일 배치를 바꾸거나 분할을 늘려봐.</span>`:''}
+      ${P.trainDays.length<nDiv?`<br><span style="color:#fbbf24">훈련일(${P.trainDays.length})이 메인 부위 수(${nDiv})보다 적어 — 일부 부위는 주 1회도 못 돌아.</span>`:''}
+    </div>`;
+  return {...P,isRest,todayD};
+}
+
 function renderWoRec(){
   const el=document.getElementById('woRecBody'); if(!el) return;
   document.querySelectorAll('.wo-freq').forEach(b=>b.classList.toggle('active',+b.dataset.f===recCfg.freq));
@@ -2267,12 +2396,14 @@ function renderWoRec(){
 
   // 주당 목표/실제 세트 수 (절대 기준 비교용)
   const weeklyTotal=(actSets/DAYS)*7;
-  const weeklyTargetTotal = recCfg.freq * 12;   // 세션당 12세트 가정
+  const freq = 7 - (recCfg.rest||[]).length;    // 휴무일에서 자동 산출
+  const weeklyTargetTotal = freq * 12;          // 세션당 12세트 가정
   const perPart={}; active.forEach(p=>perPart[p]={
     actual: +((st[p].sets/DAYS)*7).toFixed(1),
     target: +(weeklyTargetTotal*tgt[p]/100).toFixed(1)
   });
 
+  const PLAN=renderWoPlan(tgt,excl);
   const now=new Date();
   const hoursSince=p=>st[p].last? (now-st[p].last)/3600000 : 9999;
 
@@ -2289,9 +2420,12 @@ function renderWoRec(){
     const days = st[p].last? Math.floor((now-st[p].last)/86400000) : null;
     const gap  = share[p]-tgt[p];
     const bonus= staleBonus(days);
-    return { p, gap, share:share[p], tgt:tgt[p],
+    // 오늘 요일에 계획된 부위엔 소폭 가점 (계획을 흔들지 않되 절대적이진 않게)
+    const planned = PLAN && PLAN.plan[PLAN.todayD]===p;
+    const planBonus = planned?6:0;
+    return { p, gap, share:share[p], tgt:tgt[p], planned,
              h: hoursSince(p), rest: hoursSince(p)>=REST_HOURS,
-             days, bonus, score: gap-bonus };
+             days, bonus, score: gap-bonus-planBonus };
   }).sort((a,b)=>a.score-b.score);
 
   const ready=cands.filter(c=>c.rest);
@@ -2328,7 +2462,7 @@ function renderWoRec(){
     if(!combo.length && need.length) combo.push(need.slice().sort((a,b)=>a.score-b.score)[0].p);
     combo=combo.slice(0,2);
   }
-  const perSession=Math.round(weeklyTargetTotal/recCfg.freq);
+  const perSession=Math.round(weeklyTargetTotal/freq);
 
   // 모든 메인 부위가 목표를 넘었는지 / 총량이 과다한지
   const allMainOver = readyMain.length>0 && readyMain.every(c=>c.gap>=0);
@@ -2342,13 +2476,20 @@ function renderWoRec(){
     }else{
       splitNote=`${pick.p} ${noDeficit?'4세트로 가볍게':'단독 '+perSession+'세트'}. 붙일 만한 보조 부위가 지금은 다 회복 구간이야.`;
     }
-    if(recCfg.freq<=3) splitNote+=`<br>· 주 ${recCfg.freq}회면 세션당 부위를 2개씩 묶어야 5개 부위가 한 바퀴 돌아.`;
+    if(freq<=3) splitNote+=`<br>· 주 ${freq}회면 세션당 부위를 2개씩 묶어야 5개 부위가 한 바퀴 돌아.`;
   }
 
   const sign=v=>(v>0?'+':'')+v.toFixed(0)+'%p';
   const col=v=>v<=-5?'#4ade80':v<5?'#fbbf24':'#f87171';
 
   el.innerHTML=`
+    ${PLAN&&PLAN.isRest?`<div class="a-card info" style="margin-bottom:.6rem;padding:.8rem .9rem">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">😴 오늘(${WD[PLAN.todayD]})은 휴무일</div>
+      <div style="font-size:11.5px;color:var(--text2);line-height:1.55">
+        다음 훈련일은 ${(()=>{for(let i=1;i<=7;i++){const d=(PLAN.todayD+i)%7;if(PLAN.trainDays.includes(d))return `${WD[d]}요일 (${PLAN.plan[d]||'미배정'})`;}return '없음';})()}야.
+        운동하려면 아래 추천을 참고하고, 계획대로면 쉬는 게 회복에 맞아.
+      </div>
+    </div>`:''}
     ${noDeficit?`<div class="a-card warn" style="margin-bottom:.6rem;padding:.8rem .9rem">
       <div style="font-size:14px;font-weight:600;margin-bottom:5px">🛑 지금은 추가할 부위가 없어</div>
       <div style="font-size:12px;color:var(--text2);line-height:1.6">
@@ -2369,6 +2510,7 @@ function renderWoRec(){
       <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
         <span style="font-size:22px;font-weight:700">${pick.p}</span>
         <span style="font-size:11.5px;color:var(--text3)">${pick.days!=null?`${pick.days}일 전 수행`:'기록 없음'}</span>
+        ${pick.planned?'<span style="font-size:10.5px;color:#4ade80;border:1px solid rgba(74,222,128,0.4);border-radius:4px;padding:1px 6px">계획대로</span>':(PLAN&&PLAN.plan[PLAN.todayD]?`<span style="font-size:10.5px;color:#fbbf24">계획은 ${PLAN.plan[PLAN.todayD]}</span>`:'')}
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:5px;font-family:'DM Mono',monospace">
         14일 비중 ${pick.share.toFixed(0)}% (목표 ${pick.tgt.toFixed(0)}%) · 갭 <b style="color:${col(pick.gap)}">${sign(pick.gap)}</b>
@@ -2392,7 +2534,9 @@ function renderWoRec(){
       <div style="font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.5">뭘 더 할지보다 뭘 줄일지가 총 볼륨 관리엔 더 직접적이야. 이 부위 세트를 덜어서 부족한 쪽으로 옮기면 총량은 그대로 유지돼.</div>
     </div>`:''}
 
-    <table class="wk-table"><thead><tr>
+    <details style="margin-top:.2rem">
+    <summary style="font-size:11.5px;color:var(--text3);cursor:pointer;padding:4px 0">부위별 상세 · 주간 총량 (${weeklyTotal.toFixed(0)}/${weeklyTargetTotal}세트)</summary>
+    <table class="wk-table" style="margin-top:.4rem"><thead><tr>
       <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주평균<br>세트</th><th>마지막</th><th>순위<br>점수</th>
     </tr></thead><tbody>
     <tr><td colspan="7" style="text-align:left;font-size:10.5px;color:var(--text3);padding-top:6px">메인 — 세션 주제</td></tr>
@@ -2419,13 +2563,14 @@ function renderWoRec(){
     </tbody></table>
 
     <div style="font-size:11px;color:var(--text2);margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);line-height:1.6">
-      <b>주 평균 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${recCfg.freq}회 × 12세트)
+      <b>주 평균 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${freq}회 × 12세트)
       ${weeklyTotal>weeklyTargetTotal*1.25?'<br><span style="color:#fb923c">목표보다 25% 이상 많아 — 회복이 안 따라오면 디로드 시점이야.</span>':''}
       ${weeklyTotal<weeklyTargetTotal*0.7?'<br><span style="color:#fbbf24">목표보다 30% 이상 적어 — 자극이 부족할 수 있어.</span>':''}
       ${cands.filter(c=>c.days!=null&&c.days>=7).length?`<br><span style="color:#fbbf24">${cands.filter(c=>c.days>=7).map(c=>`${c.p} ${c.days}일`).join(', ')} 방치 중 — 주 2회 자극이 주 1회보다 유리해서 순위 가점이 들어가 있어.</span>`:''}
       <br><span style="color:var(--text3);font-size:10.5px">순위 점수 = 볼륨 갭 − 방치 가점. 낮을수록 우선. 가점은 ${STALE_FROM}일까지 0이고 그 뒤로 가속해서, 9~10일 방치되면 갭 차이를 뒤집어.
       <br>부위별 주 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.<br>모든 '주' 수치는 달력 주(월~일)가 아니라 <b>최근 14일 페이스를 7일로 환산</b>한 값이야. 주 초반에 항상 부족하게 나오는 걸 피하려고 이렇게 했어.</span>
-    </div>`;
+    </div>
+    </details>`;
 
   renderWoWeightCfg();
 }
