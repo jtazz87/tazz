@@ -555,7 +555,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.10-g';
+const APP_VERSION='2026.09.10-h';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -607,6 +607,7 @@ let woIdxDays     = 90;         // 종합 지수 기간
 let woRangeDays   = 0;          // 그래프 기간 (0=전체)
 let woLogShow     = 10;         // 기록 목록에 보여줄 날짜 수
 let woLogOpen     = false;      // 기록 목록 펼침 여부 (기본 접힘)
+let woDetailOpen  = false;      // 부위별 상세표 펼침 여부 (기본 접힘)
 
 // ── Load & Migrate ─────────────────────────────────────
 function init() {
@@ -2553,8 +2554,8 @@ function renderWoRec(){
       <div style="font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.5">뭘 더 할지보다 뭘 줄일지가 총 볼륨 관리엔 더 직접적이야. 이 부위 세트를 덜어서 부족한 쪽으로 옮기면 총량은 그대로 유지돼.</div>
     </div>`:''}
 
-    <details style="margin-top:.2rem">
-    <summary style="font-size:11.5px;color:var(--text3);cursor:pointer;padding:4px 0">부위별 상세 · 주간 총량 (${weeklyTotal.toFixed(0)}/${weeklyTargetTotal}세트)</summary>
+    <div style="margin-top:.2rem;font-size:11.5px;color:var(--text3);cursor:pointer;padding:4px 0;user-select:none" onclick="toggleWoDetail()">${woDetailOpen?'▼':'▶'} 부위별 상세 · 주간 총량 (${weeklyTotal.toFixed(0)}/${weeklyTargetTotal}세트)</div>
+    ${woDetailOpen?`
     <table class="wk-table" style="margin-top:.4rem"><thead><tr>
       <th style="text-align:left">부위</th><th>비중</th><th>목표</th><th>갭</th><th>주평균<br>세트</th><th>마지막</th><th>순위<br>점수</th>
     </tr></thead><tbody>
@@ -2588,8 +2589,8 @@ function renderWoRec(){
       ${cands.filter(c=>c.days!=null&&c.days>=7).length?`<br><span style="color:#fbbf24">${cands.filter(c=>c.days>=7).map(c=>`${c.p} ${c.days}일`).join(', ')} 방치 중 — 주 2회 자극이 주 1회보다 유리해서 순위 가점이 들어가 있어.</span>`:''}
       <br><span style="color:var(--text3);font-size:10.5px">순위 점수 = 볼륨 갭 − 방치 가점. 낮을수록 우선. 가점은 ${STALE_FROM}일까지 0이고 그 뒤로 가속해서, 9~10일 방치되면 갭 차이를 뒤집어.
       <br>부위별 주 권장 ${SETS_PER_PART_MIN}~${SETS_PER_PART_MAX}세트. 그 밖이면 색으로 표시돼.<br>모든 '주' 수치는 달력 주(월~일)가 아니라 <b>최근 14일 페이스를 7일로 환산</b>한 값이야. 주 초반에 항상 부족하게 나오는 걸 피하려고 이렇게 했어.</span>
-    </div>
-    </details>`;
+    </div>`:''}
+    `;
 
   renderWoWeightCfg();
 }
@@ -3004,6 +3005,10 @@ function renderWoTrendInner(){
       }}
   });
 }
+
+// 네이티브 <details>가 모바일에서 열자마자 즉시 닫혀버리는 문제가 있어
+// 직접 상태를 들고 있다가 다시 그리는 방식으로 바꿨다 (workout log 목록과 같은 패턴).
+function toggleWoDetail(){ woDetailOpen=!woDetailOpen; renderWoRec(); }
 
 function woMsg(type,msg){ const el=document.getElementById('woStatus'); el.className='status '+type; el.textContent=msg; }
 
