@@ -561,7 +561,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.10-q';
+const APP_VERSION='2026.09.10-r';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -2977,7 +2977,48 @@ function renderWoTrendInner(){
   const detail = bw
     ? `${L.totalReps}회 / ${L.sets}세트`
     : `탑세트 ${L.top}kg × ${L.topReps}회 · 볼륨 ${woNum(L.volume)}kg · e1RM ${L.e1rm.toFixed(1)}kg`;
-  sum.innerHTML=`${diagCard}${periodTable}${cards}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
+
+  // ── 오늘 vs 최고기록 세션 나란히 비교 ──
+  // '최근 세션' 문장 하나로는 지금이 잘하고 있는 건지 감이 안 온다.
+  // 최고기록이 나온 실제 세트 구성(무게×횟수)과 나란히 놓아야 비교가 된다.
+  const prIdx = vals.lastIndexOf(best);
+  const PR = S[prIdx];
+  const isToday = prIdx===S.length-1;
+  let prBlock='';
+  if(PR && S.length>=2){
+    const fmt=s=>bw?`${s.totalReps}회 × ${s.sets}세트`:`${s.top}kg × ${s.topReps}회`;
+    const todayKey=L[key], prKey=PR[key];
+    const gapPct=woPct(todayKey,prKey);
+    const barPct=Math.max(4,Math.min(100, todayKey/prKey*100));
+    prBlock=`<div style="margin-bottom:.6rem">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--text3);margin-bottom:4px">
+        <span>오늘 vs 최고기록</span>
+        <span>${isToday?'오늘이 최고기록이야':`오늘 ${label} ${woSign(gapPct)} · 최고기록 대비 ${(todayKey/prKey*100).toFixed(0)}%`}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px">
+            <span style="color:var(--text2)">오늘 (${L.date})</span>
+            <span style="font-family:'DM Mono',monospace;color:var(--text)">${fmt(L)}</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+            <div style="width:${barPct}%;height:100%;background:${isToday?'#fbbf24':'#4ade80'}"></div>
+          </div>
+        </div>
+        ${isToday?'':`<div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px">
+            <span style="color:var(--text2)">최고기록 (${PR.date})</span>
+            <span style="font-family:'DM Mono',monospace;color:var(--text)">${fmt(PR)}</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+            <div style="width:100%;height:100%;background:#fbbf24"></div>
+          </div>
+        </div>`}
+      </div>
+    </div>`;
+  }
+
+  sum.innerHTML=`${diagCard}${periodTable}${cards}${prBlock}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
     최근 세션 <b style="color:var(--text)">${L.date}</b> — <span style="font-family:'DM Mono',monospace">${detail}</span> · 총 ${S.length}세션</div>`;
 
   // ── 차트: 기간 필터 + 장기 구간은 주간 평균으로 집계 ──
