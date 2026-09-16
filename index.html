@@ -32,6 +32,11 @@ window.addEventListener('unhandledrejection',function(ev){
 });
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// 차트가 계속 다시 그려지는 원인 중 하나로 devicePixelRatio 재계산이 의심돼
+// 값을 고정해서 그 경로 자체를 없앤다. (Chart.js 로드 직후, 최대한 이른 시점)
+window.addEventListener('DOMContentLoaded',()=>{ if(typeof Chart!=='undefined'&&Chart.defaults) Chart.defaults.devicePixelRatio=Math.min(window.devicePixelRatio||1,2); });
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500&display=swap');
@@ -561,7 +566,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.10-r';
+const APP_VERSION='2026.09.10-s';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -1089,7 +1094,7 @@ function renderCharts(){
   const fatData=months.map(m=>{ const a=monthlyAvg(data,m); return a?.fat??null; });
 
   const mkOpts=(min,max)=>({
-    responsive:true,maintainAspectRatio:false,resizeDelay:200,
+    responsive:true,maintainAspectRatio:false,resizeDelay:200,animation:false,
     // resizeDelay: 캔버스가 %너비 컨테이너 안에 있으면 아주 미세한 크기 변화가
     // 리사이즈→재계산→재리사이즈로 무한 반복되며 화면이 계속 미세하게 흔들리는
     // 버그가 생길 수 있다. 200ms 디바운스로 그 루프를 끊는다.
@@ -3085,7 +3090,7 @@ function renderWoTrendInner(){
           borderWidth:1, borderDash:[2,4], pointRadius:0, fill:false, order:3 }]:[])
       ]
     },
-    options:{responsive:true,maintainAspectRatio:false,resizeDelay:200,
+    options:{responsive:true,maintainAspectRatio:false,resizeDelay:200,animation:false,
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{display:true,position:'bottom',labels:{color:'#888',boxWidth:10,boxHeight:2,font:{size:10},padding:10,usePointStyle:false}},
