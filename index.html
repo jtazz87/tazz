@@ -566,7 +566,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.10-s';
+const APP_VERSION='2026.09.16-a';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -2303,6 +2303,20 @@ function woSubPart(ex){
   return '기타';
 }
 const REST_HOURS=48;              // 같은 부위 회복 간격
+// 세부 부위가 달라도 실제 근육은 크게 겹친다.
+// 예: 등(넓이)=랫풀다운/풀업, 등(두께)=로우 — 광배·능형근·후면삼각근을 공유하므로
+// 어제 한쪽을 했으면 오늘 다른 쪽도 회복 대기여야 한다.
+// 값은 겹침 비율(0~1): 1이면 같은 부위 취급, 0.6이면 회복시간의 60%만 적용.
+const PART_OVERLAP={
+  '등(넓이)': {'등(두께)':0.8, '팔(이두)':0.6, '어깨(후면)':0.6},
+  '등(두께)': {'등(넓이)':0.8, '팔(이두)':0.6, '어깨(후면)':0.7},
+  '가슴':     {'어깨(전면)':0.7, '팔(삼두)':0.6},
+  '어깨(전면)':{'가슴':0.6, '팔(삼두)':0.5},
+  '어깨(후면)':{'등(두께)':0.6, '등(넓이)':0.5},
+  '팔(이두)': {'등(넓이)':0.4, '등(두께)':0.4},
+  '팔(삼두)': {'가슴':0.4, '어깨(전면)':0.4},
+  '하체':     {}
+};
 const SETS_PER_PART_MIN=10;       // 주당 부위별 권장 하한
 const SETS_PER_PART_MAX=20;       // 상한
 const STALE_FROM=4;               // 방치 가점 시작일
@@ -2472,6 +2486,20 @@ function renderWoRec(){
   const PLAN=renderWoPlan(tgt,excl);
   const now=new Date();
   const hoursSince=p=>st[p].last? (now-st[p].last)/3600000 : 9999;
+  // 겹치는 부위까지 고려한 실질 회복 여부.
+  // 자기 자신은 물론, 근육이 겹치는 다른 부위를 최근에 했으면 그만큼 회복이 덜 된 것으로 본다.
+  const restInfo=p=>{
+    let blocked=null, need=REST_HOURS;
+    if(hoursSince(p)<REST_HOURS){ blocked=p; need=REST_HOURS; }
+    else {
+      const ov=PART_OVERLAP[p]||{};
+      for(const [other,ratio] of Object.entries(ov)){
+        const req=REST_HOURS*ratio;
+        if(hoursSince(other)<req){ blocked=other; need=req; break; }
+      }
+    }
+    return {rest: blocked===null, blockedBy: blocked, needH: need};
+  };
 
   // 후보: 제외 아님 + 회복 간격 지남
   // 순위는 볼륨 갭이 기본이지만, 오래 방치된 부위엔 가점을 준다.
@@ -2489,8 +2517,9 @@ function renderWoRec(){
     // 오늘 요일에 계획된 부위엔 소폭 가점 (계획을 흔들지 않되 절대적이진 않게)
     const planned = PLAN && PLAN.plan[PLAN.todayD]===p;
     const planBonus = planned?6:0;
+    const ri=restInfo(p);
     return { p, gap, share:share[p], tgt:tgt[p], planned,
-             h: hoursSince(p), rest: hoursSince(p)>=REST_HOURS,
+             h: hoursSince(p), rest: ri.rest, blockedBy: ri.blockedBy,
              days, bonus, score: gap-bonus-planBonus };
   }).sort((a,b)=>a.score-b.score);
 
@@ -2607,7 +2636,7 @@ function renderWoRec(){
     </tr></thead><tbody>
     <tr><td colspan="7" style="text-align:left;font-size:10.5px;color:var(--text3);padding-top:6px">메인 — 세션 주제</td></tr>
     ${cands.filter(c=>MAIN_PARTS.includes(c.p)).map(c=>`<tr>
-      <td style="text-align:left;font-weight:500">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
+      <td style="text-align:left;font-weight:500">${c.p}${!c.rest?`<span style="color:#60a5fa;font-size:9.5px"> 회복중${c.blockedBy&&c.blockedBy!==c.p?`(${c.blockedBy} 겹침)`:''}</span>`:''}</td>
       <td>${c.share.toFixed(0)}%</td>
       <td style="color:var(--text3)">${c.tgt.toFixed(0)}%</td>
       <td style="color:${col(c.gap)};font-weight:600">${sign(c.gap)}</td>
@@ -2617,7 +2646,7 @@ function renderWoRec(){
     </tr>`).join('')}
     <tr><td colspan="7" style="text-align:left;font-size:10.5px;color:var(--text3);padding-top:8px">보조 — 메인 뒤에 붙임</td></tr>
     ${cands.filter(c=>AUX_PARTS.includes(c.p)||c.p==='기타').map(c=>`<tr>
-      <td style="text-align:left;padding-left:10px;color:var(--text2)">${c.p}${!c.rest?'<span style="color:#60a5fa;font-size:9.5px"> 회복중</span>':''}</td>
+      <td style="text-align:left;padding-left:10px;color:var(--text2)">${c.p}${!c.rest?`<span style="color:#60a5fa;font-size:9.5px"> 회복중${c.blockedBy&&c.blockedBy!==c.p?`(${c.blockedBy} 겹침)`:''}</span>`:''}</td>
       <td>${c.share.toFixed(0)}%</td>
       <td style="color:var(--text3)">${c.tgt.toFixed(0)}%</td>
       <td style="color:${col(c.gap)};font-weight:600">${sign(c.gap)}</td>
