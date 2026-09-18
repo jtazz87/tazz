@@ -293,6 +293,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div class="field"><label>체수분 (L)</label><input id="f-water" type="number" step="0.1"></div>
         </div>
         <div class="grid3" style="margin-bottom:.75rem">
+          <div class="field"><label>측정 시점</label>
+            <select id="f-timing">
+              <option value="식전">식전(공복)</option>
+              <option value="식후">식후</option>
+            </select>
+          </div>
           <div class="field"><label>내장지방레벨</label><input id="f-vfat" type="number" step="1"></div>
           <div class="field"><label>복부지방률 (WHR)</label><input id="f-whr" type="number" step="0.01"></div>
           <div class="field"><label>&nbsp;</label>
@@ -334,6 +340,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="toggle-row" id="gymToggleAnalysis"><span class="toggle-label">헬스장</span></div>
     <div class="toggle-row" id="goalToggleAnalysis"><span class="toggle-label">목표</span></div>
+    <div class="toggle-row" id="timingToggleAnalysis"><span class="toggle-label">시점</span></div>
     <div class="a-card info" style="margin-bottom:.65rem">
       <div class="a-title">📊 기기 보정 월별 추세
         <span id="refGymLabel" style="font-size:10px;color:var(--text3);margin-left:4px">기준: —</span>
@@ -357,6 +364,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="toggle-row" id="gymToggleChart"><span class="toggle-label">헬스장</span></div>
     <div class="toggle-row" id="goalToggleChart"><span class="toggle-label">목표</span></div>
+    <div class="toggle-row" id="timingToggleChart"><span class="toggle-label">시점</span></div>
     <div class="chart-card" style="margin-bottom:.75rem">
       <div style="font-size:11px;color:var(--text2);font-weight:500;margin-bottom:.6rem">골격근량 (kg) — 월별 평균</div>
       <div class="chart-wrap"><canvas id="muscleChart"></canvas></div>
@@ -378,9 +386,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="toggle-row" id="gymToggleHistory"><span class="toggle-label">헬스장</span></div>
     <div class="toggle-row" id="goalToggleHistory"><span class="toggle-label">목표</span></div>
+    <div class="toggle-row" id="timingToggleHistory"><span class="toggle-label">시점</span></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>날짜</th><th>기기</th><th>헬스장</th><th>목표</th><th>체중</th><th>근육</th><th>지방</th><th>지방%</th><th>내장</th><th>WHR</th><th>BMR</th><th>페이즈</th><th></th></tr></thead>
+        <thead><tr><th>날짜</th><th>기기</th><th>헬스장</th><th>목표</th><th>체중</th><th>근육</th><th>지방</th><th>지방%</th><th>시점</th><th>내장</th><th>WHR</th><th>BMR</th><th>페이즈</th><th></th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
@@ -536,6 +545,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="field"><label>체수분 (L)</label><input id="e-water" type="number" step="0.1"></div>
     </div>
     <div class="grid3">
+      <div class="field"><label>측정 시점</label>
+        <select id="e-timing">
+          <option value="식전">식전(공복)</option>
+          <option value="식후">식후</option>
+        </select>
+      </div>
       <div class="field"><label>내장지방레벨</label><input id="e-vfat" type="number" step="1"></div>
       <div class="field"><label>복부지방률 (WHR)</label><input id="e-whr" type="number" step="0.01"></div>
       <div class="field"><label>&nbsp;</label>
@@ -566,7 +581,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.16-a';
+const APP_VERSION='2026.09.16-d';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -597,6 +612,7 @@ let records = [], gyms = [], goalCfg = {}, offsets = {};
 let REF_GYM       = localStorage.getItem(REF_GYM_KEY) || '휘트니스엠 마포';
 let curGym        = 'all'; // 'all' or gym name
 let curGoal       = 'all'; // 'all' or goal name
+let curTiming     = '식전'; // '식전' | '식후' | 'all' — 기본은 식전(누적 2년치 기준)
 let trendStart    = '';
 let trendEnd      = '';
 let editIdx       = -1;
@@ -648,6 +664,7 @@ function init() {
     if(r.device==='InBody'&&r.date>='26.05.01'&&r.date<='26.06.05'&&!r.gym){r.gym='더블에스휘트니스';m=true;}
     if(r.device==='InBody'&&r.date>='25.11.01'&&r.date<='26.04.30'&&!r.gym){r.gym='휘트니스엠 선릉';m=true;}
     if(!r.goal){r.goal=r.date<BULK_START?'컷팅':'린벌크';m=true;}
+    if(!r.timing){r.timing='식전';m=true;}   // 기존 2년치는 전부 식전(공복) 측정
   });
   if(m) saveRec();
 
@@ -703,6 +720,7 @@ function getFiltered(){
   let arr=[...records];
   if(curGym!=='all') arr=arr.filter(r=>(r.gym||'')===curGym);
   if(curGoal!=='all') arr=arr.filter(r=>(r.goal||'')===curGoal);
+  if(curTiming!=='all') arr=arr.filter(r=>(r.timing||'식전')===curTiming);
   return arr.sort((a,b)=>a.date.localeCompare(b.date));
 }
 
@@ -710,14 +728,19 @@ function getFiltered(){
 function monthlyAvg(recs, monthPrefix){
   const all=recs.filter(r=>r.date.slice(0,5)===monthPrefix);
   if(!all.length) return null;
-  const arr=all.filter(r=>!r.bad);           // 오염 표본은 판정에서 제외
+  // 오염 표본은 항상 제외. 측정 시점은 curTiming 필터를 따른다.
+  // 식전/식후는 기준선 자체가 달라서 섞으면 추세가 깨지지만, 각각끼리는
+  // 비교가 되므로 버리지 않고 필터로 나눠 본다.
+  const arr=all.filter(r=>!r.bad && (curTiming==='all' || (r.timing||'식전')===curTiming));
   if(!arr.length) return null;
+  const nAfterMeal=all.filter(r=>(r.timing||'식전')==='식후').length;
   const avg=a=>+(a.reduce((s,v)=>s+v,0)/a.length).toFixed(1);
   const avg2=a=>+(a.reduce((s,v)=>s+v,0)/a.length).toFixed(2);
   const pick=k=>arr.filter(r=>r[k]!=null).map(r=>r[k]);
   return{
     n:arr.length,
     nExcluded:all.length-arr.length,
+    nAfterMeal,
     weight:avg(arr.map(r=>r.weight)),
     muscle:pick('muscle').length?avg(pick('muscle')):null,
     fat:avg(arr.map(r=>r.fat)),
@@ -942,6 +965,16 @@ function renderToggles(){
     el.querySelectorAll('.g-btn').forEach(b=>b.addEventListener('click',()=>setGym(b.dataset.gym,b.dataset.ctx)));
   });
 
+  [['timingToggleAnalysis','analysis'],['timingToggleChart','chart'],['timingToggleHistory','history']].forEach(([elId,ctx])=>{
+    const el=document.getElementById(elId);
+    if(!el) return;
+    const opts=[['식전','식전(공복)'],['식후','식후'],['all','전체']];
+    let html=`<span class="toggle-label">시점</span>`;
+    opts.forEach(([v,lbl])=>{ html+=`<button class="g-btn${curTiming===v?' active':''}" data-timing="${v}" data-ctx="${ctx}">${lbl}</button>`; });
+    el.innerHTML=html;
+    el.querySelectorAll('.g-btn').forEach(b=>b.addEventListener('click',()=>setTiming(b.dataset.timing,b.dataset.ctx)));
+  });
+
   [['goalToggleAnalysis','analysis'],['goalToggleChart','chart'],['goalToggleHistory','history']].forEach(([elId,ctx])=>{
     const el=document.getElementById(elId);
     if(!el) return;
@@ -959,6 +992,11 @@ function setGym(gym, ctx){
   if(ctx==='history'){ renderHistory(); return; }
   renderMonthlyTrend(); renderCharts(); renderTriggerBanner(); invalidateAnalysis();
 }
+function setTiming(t, ctx){
+  curTiming=t; renderToggles();
+  if(ctx==='history'){ renderHistory(); return; }
+  renderMonthlyTrend(); renderCharts(); renderTriggerBanner(); invalidateAnalysis();
+}
 function setGoal(goal, ctx){
   curGoal=goal; renderToggles();
   if(ctx==='history'){ renderHistory(); return; }
@@ -970,7 +1008,7 @@ function setGoal(goal, ctx){
 function invalidateAnalysis(){
   const el=document.getElementById('analysisResult');
   if(!el||!el.innerHTML.trim()) return;
-  const label=(curGym!=='all'?curGym:'전체')+(curGoal!=='all'?' · '+goalLabel(curGoal):'');
+  const label=(curGym!=='all'?curGym:'전체')+(curGoal!=='all'?' · '+goalLabel(curGoal):'')+(curTiming!=='all'?' · '+curTiming:' · 식전+식후');
   el.innerHTML=`<div class="a-card info" style="padding:.8rem .9rem">
     <div style="font-size:12.5px;font-weight:500;margin-bottom:4px">필터가 <b>${label}</b>(으)로 바뀌었어</div>
     <div style="font-size:11.5px;color:var(--text2);line-height:1.55">이전 분석 결과는 다른 필터 기준이라 지웠어. 위 <b>분석 실행</b>을 다시 눌러줘.</div>
@@ -1029,6 +1067,7 @@ function renderMonthlyTrend(){
   let data=[...records].map(applyOffset).sort((a,b)=>a.date.localeCompare(b.date));
   if(curGym!=='all') data=data.filter(r=>(r.gym||'')===curGym);
   if(curGoal!=='all') data=data.filter(r=>(r.goal||'')===curGoal);
+  if(curTiming!=='all') data=data.filter(r=>(r.timing||'식전')===curTiming);
 
   const tbl=document.getElementById('monthlyTrendTable');
   if(!data.length){ tbl.innerHTML='<p style="font-size:12px;color:var(--text3);padding:.5rem 0">기록이 없습니다.</p>'; return; }
@@ -1078,6 +1117,7 @@ function renderCharts(){
   let data=[...records].map(applyOffset).sort((a,b)=>a.date.localeCompare(b.date));
   if(curGym!=='all') data=data.filter(r=>(r.gym||'')===curGym);
   if(curGoal!=='all') data=data.filter(r=>(r.goal||'')===curGoal);
+  if(curTiming!=='all') data=data.filter(r=>(r.timing||'식전')===curTiming);
 
   const allMonths=[...new Set(data.map(r=>r.date.slice(0,5)))].sort();
   const start=trendStart&&allMonths.includes(trendStart)?trendStart:(allMonths.length>12?allMonths[allMonths.length-12]:allMonths[0]||'');
@@ -1228,6 +1268,7 @@ BMI 제외. 광고·팝업 무시. 없는항목=null. 숫자만.`});
     document.getElementById('f-fatpct').value=p.fatpct??'';
     document.getElementById('f-bmr').value=p.bmr??'';
     document.getElementById('f-water').value=p.water??'';
+    document.getElementById('f-timing').value='식전';
     document.getElementById('f-vfat').value=p.vfat??'';
     document.getElementById('f-whr').value=p.whr??'';
     document.getElementById('f-gym').value='';
@@ -1255,12 +1296,13 @@ function saveRecord(){
   const fatpct=parseFloat(document.getElementById('f-fatpct').value);
   const bmr=parseFloat(document.getElementById('f-bmr').value)||null;
   const water=parseFloat(document.getElementById('f-water').value)||null;
+  const timing=document.getElementById('f-timing').value||'식전';
   const vfat=parseFloat(document.getElementById('f-vfat').value)||null;
   const whr=parseFloat(document.getElementById('f-whr').value)||null;
   const bad=document.getElementById('f-bad').checked;
   const badReason=bad?(document.getElementById('f-badreason').value.trim()||'미기재'):null;
   if(!date||isNaN(weight)||isNaN(fat)||isNaN(fatpct)){showStatus('extractStatus','error','날짜, 체중, 체지방량, 체지방률은 필수');return;}
-  const rec={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water,vfat,whr,bad,badReason};
+  const rec={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water,vfat,whr,bad,badReason,timing};
   const idx=records.findIndex(r=>r.date===date&&r.device===device);
   if(idx>=0){if(!confirm(`${date} ${device} 기록이 있습니다. 덮어쓸까요?`))return; records[idx]=rec;}
   else records.push(rec);
@@ -1282,7 +1324,7 @@ async function importXlsx(file){
     let hr=0;
     for(let i=0;i<Math.min(5,rows.length);i++){if(rows[i].some(c=>String(c).includes('날짜')||String(c).includes('체중'))){hr=i;break;}}
     const headers=rows[hr].map(h=>String(h??'').trim());
-    const ix={date:headers.findIndex(h=>h.includes('날짜')),weight:headers.findIndex(h=>h.includes('체중')),muscle:headers.findIndex(h=>h.includes('근육')||h.includes('골격근')),fat:headers.findIndex(h=>h.includes('지방량')),fatpct:headers.findIndex(h=>h.includes('지방률')),device:headers.findIndex(h=>h.includes('기기')),gym:headers.findIndex(h=>h.includes('헬스장')),bmr:headers.findIndex(h=>h.includes('기초대사')||h.toLowerCase().includes('bmr')),water:headers.findIndex(h=>h.includes('체수분')),vfat:headers.findIndex(h=>h.includes('내장지방')),whr:headers.findIndex(h=>h.includes('복부지방')),bad:headers.findIndex(h=>h==='오염'),badReason:headers.findIndex(h=>h.includes('오염사유')),goal:headers.findIndex(h=>h.includes('목표'))};
+    const ix={date:headers.findIndex(h=>h.includes('날짜')),weight:headers.findIndex(h=>h.includes('체중')),muscle:headers.findIndex(h=>h.includes('근육')||h.includes('골격근')),fat:headers.findIndex(h=>h.includes('지방량')),fatpct:headers.findIndex(h=>h.includes('지방률')),device:headers.findIndex(h=>h.includes('기기')),gym:headers.findIndex(h=>h.includes('헬스장')),bmr:headers.findIndex(h=>h.includes('기초대사')||h.toLowerCase().includes('bmr')),water:headers.findIndex(h=>h.includes('체수분')),timing:headers.findIndex(h=>h.includes('측정시점')||h==='시점'),vfat:headers.findIndex(h=>h.includes('내장지방')),whr:headers.findIndex(h=>h.includes('복부지방')),bad:headers.findIndex(h=>h==='오염'),badReason:headers.findIndex(h=>h.includes('오염사유')),goal:headers.findIndex(h=>h.includes('목표'))};
     if(ix.date<0||ix.weight<0){showStatus('xlsxStatus','error','날짜/체중 컬럼 없음');return;}
     let imported=0,skipped=0;
     for(let i=hr+1;i<rows.length;i++){
@@ -1295,13 +1337,14 @@ async function importXlsx(file){
       const water=ix.water>=0?(parseFloat(row[ix.water])||null):null;
       const vfat=ix.vfat>=0?(parseFloat(row[ix.vfat])||null):null;
       const whr=ix.whr>=0?(parseFloat(row[ix.whr])||null):null;
+      const timing=ix.timing>=0?(String(row[ix.timing]??'').trim()==='식후'?'식후':'식전'):'식전';
       const bad=ix.bad>=0?/^(y|yes|1|true|o|오염)$/i.test(String(row[ix.bad]??'').trim()):false;
       const badReason=bad&&ix.badReason>=0?(String(row[ix.badReason]??'').trim()||'미기재'):null;
       let device=ix.device>=0?String(row[ix.device]??'').trim():'ACCUNIQ';
       if(!device) device='ACCUNIQ';
       const gym=ix.gym>=0?String(row[ix.gym]??'').trim():'';
       const goal=ix.goal>=0?String(row[ix.goal]??'').trim():'';
-      const rec={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water,vfat,whr,bad,badReason};
+      const rec={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water,vfat,whr,bad,badReason,timing};
       const ei=records.findIndex(r=>r.date===date&&r.device===device);
       if(ei>=0) records[ei]=rec; else records.push(rec);
       if(gym&&!gyms.includes(gym)) gyms.push(gym);
@@ -1317,7 +1360,7 @@ async function importXlsx(file){
 function exportXlsx(){
   if(!records.length){alert('기록이 없습니다.');return;}
   const sorted=[...records].sort((a,b)=>a.date.localeCompare(b.date));
-  const ws=XLSX.utils.json_to_sheet(sorted.map(r=>({'날짜':r.date,'체중':r.weight,'근육':r.muscle??'','지방량':r.fat,'지방률':r.fatpct,'기초대사량':r.bmr??'','체수분':r.water??'','내장지방레벨':r.vfat??'','복부지방률':r.whr??'','기기':r.device,'헬스장':r.gym??'','목표':r.goal??'','오염':r.bad?'Y':'','오염사유':r.badReason??''})));
+  const ws=XLSX.utils.json_to_sheet(sorted.map(r=>({'날짜':r.date,'체중':r.weight,'근육':r.muscle??'','지방량':r.fat,'지방률':r.fatpct,'기초대사량':r.bmr??'','체수분':r.water??'','측정시점':r.timing||'식전','내장지방레벨':r.vfat??'','복부지방률':r.whr??'','기기':r.device,'헬스장':r.gym??'','목표':r.goal??'','오염':r.bad?'Y':'','오염사유':r.badReason??''})));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
   XLSX.writeFile(wb,`체성분_${todayStr().replace(/\./g,'')}.xlsx`);
   localStorage.setItem(EXPORT_KEY,new Date().toISOString());
@@ -1365,10 +1408,11 @@ function renderHistory(){
   let list=[...records].sort((a,b)=>b.date.localeCompare(a.date));
   if(curGym!=='all') list=list.filter(r=>(r.gym||'')===curGym);
   if(curGoal!=='all') list=list.filter(r=>(r.goal||'')===curGoal);
+  if(curTiming!=='all') list=list.filter(r=>(r.timing||'식전')===curTiming);
   const el=document.getElementById('recordCount');
-  if(el) el.textContent=`총 ${records.length}개 기록${curGym!=='all'?' ('+curGym+')':''}${curGoal!=='all'?' ['+goalLabel(curGoal)+']':''}`;
+  if(el) el.textContent=`${list.length}/${records.length}개 기록${curGym!=='all'?' ('+curGym+')':''}${curGoal!=='all'?' ['+goalLabel(curGoal)+']':''}${curTiming!=='all'?' · '+curTiming:''}`;
   const tbody=document.getElementById('historyBody');
-  if(!list.length){tbody.innerHTML=`<tr><td colspan="13" class="empty">기록이 없습니다.</td></tr>`;return;}
+  if(!list.length){tbody.innerHTML=`<tr><td colspan="14" class="empty">기록이 없습니다.</td></tr>`;return;}
   tbody.innerHTML=list.map(r=>{
     const oi=records.indexOf(r);
     return `<tr>
@@ -1376,7 +1420,7 @@ function renderHistory(){
       <td><span class="tag ${r.device==='InBody'?'tag-ib':'tag-ac'}">${r.device}</span></td>
       <td><span style="font-size:11px;color:var(--text2);font-family:'Noto Sans KR',sans-serif">${r.gym||'-'}</span></td>
       <td>${r.goal?`<span class="tag ${goalTagClass(r.goal)}">${goalLabel(r.goal)}</span>`:'<span style="color:var(--text3)">-</span>'}</td>
-      <td>${r.weight}</td><td>${r.muscle??'-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td><td>${r.vfat??'-'}</td><td>${r.whr??'-'}</td><td>${r.bmr??'-'}</td>
+      <td>${r.weight}</td><td>${r.muscle??'-'}</td><td>${r.fat}</td><td>${r.fatpct}%</td><td><span style="font-size:10px;color:${(r.timing||'식전')==='식후'?'#fbbf24':'var(--text3)'}">${r.timing||'식전'}</span></td><td>${r.vfat??'-'}</td><td>${r.whr??'-'}</td><td>${r.bmr??'-'}</td>
       <td><span class="tag ${getPhase(r.date)==='bulk'?'tag-bulk':'tag-cut'}">${getPhase(r.date)==='bulk'?'린벌크':'감량'}</span></td>
       <td><button class="icon-btn edit" onclick="editRecord(${oi})" title="수정">✏️</button><button class="icon-btn" onclick="deleteRecord(${oi})" title="삭제">✕</button></td>
     </tr>`;
@@ -1391,6 +1435,7 @@ function editRecord(i){
   document.getElementById('e-device').value=r.device;
   document.getElementById('e-gym').value=r.gym||'';
   document.getElementById('e-goal').value=r.goal||'';
+  document.getElementById('e-timing').value=r.timing||'식전';
   document.getElementById('e-vfat').value=r.vfat??'';
   document.getElementById('e-whr').value=r.whr??'';
   document.getElementById('e-bad').checked=!!r.bad;
@@ -1417,12 +1462,13 @@ function saveEdit(){
   const fatpct=parseFloat(document.getElementById('e-fatpct').value);
   const bmr=parseFloat(document.getElementById('e-bmr').value)||null;
   const water=parseFloat(document.getElementById('e-water').value)||null;
+  const timing=document.getElementById('e-timing').value||'식전';
   const vfat=parseFloat(document.getElementById('e-vfat').value)||null;
   const whr=parseFloat(document.getElementById('e-whr').value)||null;
   const bad=document.getElementById('e-bad').checked;
   const badReason=bad?(document.getElementById('e-badreason').value.trim()||'미기재'):null;
   if(!date||isNaN(weight)||isNaN(fat)||isNaN(fatpct)){alert('날짜, 체중, 체지방량, 체지방률은 필수');return;}
-  records[editIdx]={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water,vfat,whr,bad,badReason};
+  records[editIdx]={date,device,gym,goal,weight,muscle,fat,fatpct,bmr,water,vfat,whr,bad,badReason,timing};
   records.sort((a,b)=>a.date.localeCompare(b.date));
   saveRec(); closeEdit(); renderAll();
 }
@@ -1534,6 +1580,7 @@ function renderTriggerBanner(){
   if(!records.length) return;
   let data=[...records].map(applyOffset).sort((a,b)=>a.date.localeCompare(b.date));
   if(curGym!=='all') data=data.filter(r=>(r.gym||'')===curGym);
+  if(curTiming!=='all') data=data.filter(r=>(r.timing||'식전')===curTiming);
   if(!data.length) return;
   const last=data[data.length-1];
   const [yr,mo]=last.date.split('.').map(Number);
@@ -1612,6 +1659,9 @@ function assessComposition(pm,cm,goal){
     facts.push('실측성 지표: '+bits.join(' · '));
   }
   if(cm.nExcluded) facts.push(`오염 표본 ${cm.nExcluded}건 제외 후 ${cm.n}회 평균`);
+  if(curTiming==='식전'&&cm.nAfterMeal) facts.push(`식후 측정 ${cm.nAfterMeal}건 제외 — 식전 기준으로만 판정 (섞으면 지방률 왜곡)`);
+  if(curTiming==='식후') facts.push(`식후 측정끼리만 비교 중 — 식전 기준값(트리거 15.5% 등)과 직접 비교하지 말 것`);
+  if(curTiming==='all') facts.push(`식전·식후 혼합 판정 — 기준선이 달라 추세가 왜곡될 수 있음`);
   if(dP!=null&&dP!==0) facts.push(`지방률 ${dP>0?'+':''}${dP}%p/월 — 이 속도면 3개월 뒤 ${(cm.fatpct+dP*3).toFixed(1)}%`);
   if(cm.weight&&dW!=null) facts.push(`체중 변화율 ${(dW/pm.weight*100).toFixed(1)}%/월 (린벌크 권장 +0.5~1.5%/월)`);
 
@@ -1652,7 +1702,7 @@ async function runAnalysis(){
   const last=filtered[filtered.length-1];
   const bulk=filtered.filter(r=>r.date>=BULK_START);
   const activeGoal=curGoal!=='all'?curGoal:(goalCfg.type||'린벌크');
-  const filterLabel=curGym!=='all'?curGym:'전체';
+  const filterLabel=(curGym!=='all'?curGym:'전체')+(curTiming!=='all'?` · ${curTiming}`:' · 식전+식후');
 
   // Recent 7 from the filtered set
   const recent7=filtered.slice(-7);
@@ -2098,8 +2148,19 @@ function woSessions(ex){
     if(m.e1rm>s.e1rm) s.e1rm=m.e1rm;
   });
   const arr=Object.values(by).sort((a,b)=>a.date<b.date?-1:1);
+  // 미니컷 구간 세션 표시 — 이 구간은 볼륨·칼로리가 줄어 e1RM 하락이 정상이므로
+  // 벌크 구간과 같은 기준으로 판정하면 '과훈련 의심' 오진이 난다.
+  const mcStart=goalCfg.minicutStart||null;
+  arr.forEach(s=>{ s.minicut = !!(mcStart && s.date>=mcStart); });
   arr.ex=ex;
   return arr;
+}
+
+// 미니컷 구간 / 벌크 구간을 분리
+function woSplitByPhase(S){
+  const bulk=S.filter(s=>!s.minicut);
+  const mc=S.filter(s=>s.minicut);
+  return {bulk, mc};
 }
 
 // ── 어시스트(보조) 종목 판정 ────────────────────────────
@@ -2964,7 +3025,11 @@ function renderWoTrendInner(){
   const avg=recent.length?recent.reduce((a,b)=>a+b,0)/recent.length:null;
 
   // ── 4주 과부하 진단 (최상단) ──
-  const dg=woDiagnose(S,bw);
+  // 진단은 벌크 구간만 사용 — 미니컷 세션이 섞이면 '큰 폭 하락' 오진이 난다.
+  // 미니컷 구간은 위 mcBlock에서 별도 기준으로 판정한다.
+  const bulkOnly = S.filter(s=>!s.minicut);
+  const S_diag = bulkOnly.length>=2 ? Object.assign(bulkOnly,{ex:S.ex}) : S;
+  const dg=woDiagnose(S_diag,bw);
   const diagCard=`<div class="a-card ${dg.cls}" style="margin-bottom:.6rem">
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
         <span style="font-size:15px">${dg.icon}</span>
@@ -2993,7 +3058,7 @@ function renderWoTrendInner(){
 
   // ── 기간별 변화 표 ──
   const rows=WO_PERIODS.map(([d,label])=>{
-    const c=woWindowChange(S,d);
+    const c=woWindowChange(S_diag,d);
     return {label,d,c};
   });
   const anyRow=rows.some(r=>r.c);
@@ -3015,6 +3080,41 @@ function renderWoTrendInner(){
   // ── 오늘 vs 최고기록 세션 나란히 비교 ──
   // '최근 세션' 문장 하나로는 지금이 잘하고 있는 건지 감이 안 온다.
   // 최고기록이 나온 실제 세트 구성(무게×횟수)과 나란히 놓아야 비교가 된다.
+  // ── 미니컷 구간 별도 판정 ──
+  // 미니컷 중엔 볼륨·칼로리가 줄어 e1RM 하락이 정상. 목표는 '상승'이 아니라
+  // '유지'이므로 벌크 구간과 판정 기준 자체가 다르다.
+  const PH = woSplitByPhase(S);
+  let mcBlock='';
+  if(PH.mc.length){
+    const mcVals=PH.mc.map(s=>s[key]);
+    const preVals=PH.bulk.map(s=>s[key]);
+    const mcNow=mcVals[mcVals.length-1];
+    // 미니컷 직전 기준선: 벌크 마지막 3세션 평균
+    const base=preVals.length?preVals.slice(-3).reduce((a,b)=>a+b,0)/Math.min(3,preVals.length):null;
+    const keep=base?(mcNow/base*100):null;
+    const drop=base?woPct(mcNow,base):null;
+    let mv,mc2;
+    if(drop==null){ mv='기준선 없음'; mc2='info'; }
+    else if(drop>=0){ mv='미니컷 중 유지·상승 — 매우 좋음'; mc2='good'; }
+    else if(drop>=-5){ mv='미니컷 중 정상 유지 (−5% 이내)'; mc2='good'; }
+    else if(drop>=-10){ mv='완만한 하락 — 허용 범위'; mc2='info'; }
+    else { mv='하락 폭 큼 — 단백질·적자폭 점검'; mc2='caution'; }
+    mcBlock=`<div class="a-card ${mc2}" style="margin-bottom:.6rem;padding:.75rem .9rem">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+        <span style="font-size:14px">✂️</span>
+        <span style="font-size:13px;font-weight:600">미니컷 구간 ${mv}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);font-family:'DM Mono',monospace;line-height:1.6">
+        미니컷 세션 ${PH.mc.length}회 · 현재 ${woNum(mcNow)}${unit}
+        ${base?`<br>미니컷 직전 기준 ${woNum(base)}${unit} → 유지율 <b style="color:${keep>=95?'#4ade80':keep>=90?'#fbbf24':'#f87171'}">${keep.toFixed(0)}%</b> (${woSign(drop)})`:''}
+      </div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);line-height:1.55">
+        미니컷 중엔 칼로리 적자로 e1RM이 떨어지는 게 정상이야. 목표는 상승이 아니라 <b>유지</b>고,
+        −5% 이내면 근손실 없이 잘 가고 있다는 뜻이야. 아래 벌크 구간 판정은 미니컷 시작(${goalCfg.minicutStart}) 전 기록만 쓴 거야.
+      </div>
+    </div>`;
+  }
+
   const prIdx = vals.lastIndexOf(best);
   const PR = S[prIdx];
   const isToday = prIdx===S.length-1;
@@ -3052,7 +3152,7 @@ function renderWoTrendInner(){
     </div>`;
   }
 
-  sum.innerHTML=`${diagCard}${periodTable}${cards}${prBlock}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
+  sum.innerHTML=`${mcBlock}${diagCard}${periodTable}${cards}${prBlock}<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
     최근 세션 <b style="color:var(--text)">${L.date}</b> — <span style="font-family:'DM Mono',monospace">${detail}</span> · 총 ${S.length}세션</div>`;
 
   // ── 차트: 기간 필터 + 장기 구간은 주간 평균으로 집계 ──
