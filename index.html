@@ -174,6 +174,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div id="swBanner"></div>
   <div id="backupBanner"></div>
   <div id="triggerBanner"></div>
+  <div id="phaseStrip"></div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="upload">측정 추가</button>
     <button class="tab-btn" data-tab="analysis">분석</button>
@@ -581,7 +582,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.16-d';
+const APP_VERSION='2026.09.16-e';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -1367,6 +1368,62 @@ function exportXlsx(){
   renderBackupBanner();
 }
 
+
+// ── 국면 이력 (벌크업/컷팅 몇 일차) ─────────────────────
+// 기록마다 goal이 저장돼 있어서 별도 상태 없이 전환 이력을 복원할 수 있다.
+// 목표를 바꾸면 그 날부터 새 국면 1일차로 리셋된다.
+function woPhaseHistory(){
+  const sorted=[...records].filter(r=>r.goal).sort((a,b)=>a.date.localeCompare(b.date));
+  const out=[];
+  sorted.forEach(r=>{
+    const last=out[out.length-1];
+    if(last && last.goal===r.goal){ last.end=r.date; last.n++; }
+    else out.push({goal:r.goal,start:r.date,end:r.date,n:1});
+  });
+  // 각 국면 일수 = 시작~종료. 마지막(현재 진행 중) 국면은 오늘까지로 센다.
+  out.forEach((p,i)=>{
+    const endRef = (i===out.length-1) ? todayStr() : p.end;
+    p.days = Math.floor((woD(endRef)-woD(p.start))/86400000)+1;
+    p.current = (i===out.length-1);
+  });
+  return out;
+}
+
+function woCurrentPhase(){
+  const hist=woPhaseHistory();
+  const cur=hist[hist.length-1];
+  const type=goalCfg.type||'';
+  // 목표를 방금 바꿨고 그 목표의 기록이 아직 없으면 오늘이 1일차
+  if(type && (!cur || cur.goal!==type)){
+    const start=(type==='컷팅'&&goalCfg.minicutStart)?goalCfg.minicutStart:todayStr();
+    return {goal:type,start,days:Math.floor((woD(todayStr())-woD(start))/86400000)+1,n:0,current:true,fresh:true};
+  }
+  return cur||null;
+}
+
+const PHASE_SHORT={'컷팅':'컷팅','린벌크':'린벌크','더티벌크':'더티벌크','눈바디개선':'눈바디'};
+
+// 국면 이력을 한 줄 스트립으로
+function renderPhaseStrip(){
+  const el=document.getElementById('phaseStrip'); if(!el) return;
+  const hist=woPhaseHistory();
+  if(!hist.length){ el.innerHTML=''; return; }
+  const cur=woCurrentPhase();
+  const recent=hist.slice(-4);   // 최근 4국면만
+  const col=g=>g==='컷팅'?'#60a5fa':g==='더티벌크'?'#fb923c':g==='눈바디개선'?'#a78bfa':'#4ade80';
+  el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem">
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--text2)">현재 국면</span>
+      <span style="font-size:17px;font-weight:700;color:${col(cur.goal)}">${PHASE_SHORT[cur.goal]||cur.goal} ${cur.days}일차</span>
+      <span style="font-size:10.5px;color:var(--text3)">${cur.start} 시작${cur.fresh?' (기록 없음)':` · 측정 ${cur.n}회`}</span>
+    </div>
+    <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;font-size:10.5px;font-family:'DM Mono',monospace">
+      ${recent.map((p,i)=>`<span style="color:${col(p.goal)};${p.current?'font-weight:700':'opacity:.65'}">${PHASE_SHORT[p.goal]||p.goal} ${p.days}일</span>${i<recent.length-1?'<span style="color:var(--text3)">→</span>':''}`).join('')}
+    </div>
+    ${hist.length>4?`<div style="font-size:10px;color:var(--text3);margin-top:3px">이전 ${hist.length-4}개 국면 생략</div>`:''}
+  </div>`;
+}
+
 // ── 백업 리마인더 ──────────────────────────────────────
 function renderBackupBanner(){
   const el=document.getElementById('backupBanner'); if(!el) return;
@@ -1401,6 +1458,7 @@ function renderAll(){
   renderMonthlyTrend();
   renderBackupBanner();
   renderTriggerBanner();
+  try{ renderPhaseStrip(); }catch(e){ showErr('국면 표시',e); }
 }
 
 // ── History ────────────────────────────────────────────
@@ -1738,7 +1796,33 @@ async function runAnalysis(){
   }
   const asmtTxt=asmt?`\n[확정 판정 — 규칙 기반으로 이미 계산됨. 이 판정을 뒤집거나 완화하지 말 것]\n등급:${asmt.grade} / ${asmt.verdict}\n근거:${asmt.facts.join(' · ')}`:'';
 
-  const prompt=`체성분 데이터 분석. 38세 남성 177cm. 목표:${activeGoal}. 필터:${filterLabel}.
+  // 목표별 판정 기준을 프롬프트에 명시 — 목표 이름만 주면 AI가 전부 벌크 관점으로
+  // 해석해서, 컷팅 중인데 "지방이 늘었다"식 엉뚱한 조언이 나온다.
+  const GOAL_RULES={
+    '컷팅': `[컷팅 판정 기준 — 이 기준으로만 해석할 것]
+- 목표는 지방 감소이며 체중 감소는 정상이다. 체중이 줄었다고 부정적으로 쓰지 말 것.
+- 성공 = 지방 감소 + 골격근 유지. 골격근이 유지(±0.3kg)되면 그것 자체가 성과다.
+- 골격근 감소 −0.4kg/월 초과가 유일한 실패 신호다. 이때만 경고할 것.
+- e1RM·운동 강도 하락은 칼로리 적자에서 정상이다. 과훈련으로 해석하지 말 것.
+- 지방이 안 빠지는 것이 문제이며, 지방률 상승 시에만 섭취 재점검을 권할 것.
+- 미니컷 스펙: 결핍 −300~500kcal, 기간 3~4주, 단백질 체중×2.2~2.5g, 훈련 강도 유지·볼륨 20% 감량 허용, 종료는 지방률 12% 복귀 또는 4주 경과.`,
+    '린벌크': `[린벌크 판정 기준]
+- 목표는 근육 증가이며 소폭 지방 증가는 허용된다.
+- 핵심 지표는 근육:지방 증가 비율. 1:1 이상이면 정상, 1:2 미만이면 과잉 증량이다.
+- 지방률 +0.8%p/월 초과면 잉여 칼로리 축소를 권할 것.`,
+    '더티벌크': `[더티벌크 판정 기준]
+- 지방 증가는 허용 범위다. 근육이 늘고 있는지만 판정할 것.
+- 근육 증가가 없으면 훈련 문제이며 칼로리 문제가 아니다.`,
+    '눈바디개선': `[눈바디개선(리컴프) 판정 기준]
+- 목표는 체중 유지하며 근육↑·지방↓. 체중 변화가 작은 것이 정상이다.
+- 근육과 지방이 반대 방향으로 움직이는지가 핵심이다.`
+  };
+  const goalRule=GOAL_RULES[activeGoal]||GOAL_RULES['린벌크'];
+  const ph=woCurrentPhase();
+  const phTxt=ph?`\n[국면] ${ph.goal} ${ph.days}일차 (${ph.start} 시작${ph.n?`, 측정 ${ph.n}회`:''})`:'';
+
+  const prompt=`체성분 데이터 분석. 38세 남성 177cm. 목표:${activeGoal}. 필터:${filterLabel}.${phTxt}
+${goalRule}
 측정 간격 불규칙 — 아래는 날짜가 아니라 '기록 ${recent7.length}개'다.
 ${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평균:pmAvg,[`최근기록${recent7.length}개`]:recent7.map(slim)})}${asmtTxt}${nrg?`\n[칼로리 역산] 추정 유지 ${nrg.maint}kcal / 추정 섭취 ${nrg.intake}kcal / 현재 수지 ${nrg.bal>0?'+':''}${nrg.bal}kcal / 권장 수지 ${nrg.target>0?'+':''}${nrg.target}kcal / 조정 필요 ${nrg.adjust>0?'+':''}${nrg.adjust}kcal`:''}
 
@@ -1750,6 +1834,8 @@ ${JSON.stringify({시작:slim(bulk[0]??filtered[0]),당월평균:cmAvg,전월평
 5. grade는 위 확정 판정 값을 그대로 사용.
 6. 기록은 운동한 날에만 측정하므로 간격이 불규칙하다. "최근 5일간", "일주일간", "지난주" 같은 물리적 기간 표현 절대 금지. 반드시 "최근 ${recent7.length}개 기록", "최근 ${recent7.length}회 측정"처럼 횟수로 표현할 것.
 7. recent.body는 위 ${recent7.length}개 기록 전체를 근거로 쓸 것.
+8. 위 [${activeGoal} 판정 기준]을 반드시 적용할 것. 다른 목표의 기준으로 해석하면 오진이다.
+${ph?`9. 현재 ${ph.goal} ${ph.days}일차임을 감안할 것. 국면 초반(7일 이내)이면 변화가 작은 것이 정상이므로 성급한 판정을 하지 말 것.`:''}
 
 JSON만: {"trend":{"grade":"${asmt?asmt.grade:'caution'}","title":"요약","points":["수치근거 핵심1","수치근거 핵심2"]},"recent":{"body":"흐름2문장"},"advice":{"prev":"전월vs당월 사실비교 1문장","action":"지금 조정할 것 1문장(칼로리 역산값이 있으면 구체적 kcal 포함)"}}`;
 
