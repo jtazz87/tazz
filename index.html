@@ -174,6 +174,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div id="swBanner"></div>
   <div id="backupBanner"></div>
   <div id="triggerBanner"></div>
+  <div id="badDateBanner"></div>
   <div id="phaseStrip"></div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="upload">측정 추가</button>
@@ -582,7 +583,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.16-e';
+const APP_VERSION='2026.09.16-h';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -1369,15 +1370,56 @@ function exportXlsx(){
 }
 
 
+
+// ── 이상 날짜 탐지 ──────────────────────────────────────
+// 오타로 연도가 잘못 들어가면(24 → 20 등) 국면 일수가 수천 일로 튀고
+// 월별 평균·추세까지 전부 망가진다. 눈에 띄게 잡아준다.
+const TRAIN_START='24.10.14';   // 사용자가 밝힌 운동 시작일
+function woFindBadDates(){
+  const bad=[];
+  const todayD=woD(todayStr());
+  records.forEach((r,i)=>{
+    const d=woD(r.date);
+    let why=null;
+    if(isNaN(d)) why='날짜 형식 오류';
+    else if(r.date<TRAIN_START) why=`운동 시작(${TRAIN_START}) 이전`;
+    else if(d>todayD) why='미래 날짜';
+    if(why) bad.push({i,date:r.date,why,gym:r.gym||'',weight:r.weight});
+  });
+  return bad;
+}
+
+function renderBadDateBanner(){
+  const el=document.getElementById('badDateBanner'); if(!el) return;
+  const bad=woFindBadDates();
+  if(!bad.length){ el.innerHTML=''; return; }
+  el.innerHTML=`<div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.5);border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem">
+    <div style="font-size:12.5px;color:#f87171;font-weight:600;margin-bottom:5px">⚠️ 날짜가 이상한 기록 ${bad.length}건</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:6px">
+      연도 오타(예: 24→20)가 있으면 국면 일수가 수천 일로 튀고 월별 추세도 망가져. 아래 날짜를 눌러 수정해줘.
+    </div>
+    ${bad.slice(0,8).map(b=>`<div style="font-size:11.5px;font-family:'DM Mono',monospace;margin-bottom:2px">
+      <span onclick="editRecord(${b.i})" style="color:var(--blue);cursor:pointer;text-decoration:underline dotted">${b.date}</span>
+      <span style="color:var(--text3)"> · ${b.weight}kg${b.gym?' · '+b.gym:''} — ${b.why}</span>
+    </div>`).join('')}
+    ${bad.length>8?`<div style="font-size:10.5px;color:var(--text3);margin-top:3px">외 ${bad.length-8}건</div>`:''}
+  </div>`;
+}
+
 // ── 국면 이력 (벌크업/컷팅 몇 일차) ─────────────────────
 // 기록마다 goal이 저장돼 있어서 별도 상태 없이 전환 이력을 복원할 수 있다.
 // 목표를 바꾸면 그 날부터 새 국면 1일차로 리셋된다.
+const PHASE_GAP_DAYS=90;   // 이 기간 이상 측정이 비면 국면이 끊긴 것으로 본다
+                           // (매일 측정하는 사용자 기준이라 넉넉하게. 짧으면 국면이 과도하게 쪼개진다)
 function woPhaseHistory(){
   const sorted=[...records].filter(r=>r.goal).sort((a,b)=>a.date.localeCompare(b.date));
   const out=[];
   sorted.forEach(r=>{
     const last=out[out.length-1];
-    if(last && last.goal===r.goal){ last.end=r.date; last.n++; }
+    // 목표가 같아도 측정이 오래 비었으면 다른 국면으로 끊는다.
+    // (몇 달 안 쟀다가 다시 시작한 걸 하나의 연속 국면으로 세면 수천 일이 나온다)
+    const gap = last ? (woD(r.date)-woD(last.end))/86400000 : 0;
+    if(last && last.goal===r.goal && gap<=PHASE_GAP_DAYS){ last.end=r.date; last.n++; }
     else out.push({goal:r.goal,start:r.date,end:r.date,n:1});
   });
   // 각 국면 일수 = 시작~종료. 마지막(현재 진행 중) 국면은 오늘까지로 센다.
@@ -1385,6 +1427,9 @@ function woPhaseHistory(){
     const endRef = (i===out.length-1) ? todayStr() : p.end;
     p.days = Math.floor((woD(endRef)-woD(p.start))/86400000)+1;
     p.current = (i===out.length-1);
+    // BULK_START 이전 기록은 목표 라벨이 없어서 마이그레이션이 '컷팅'을 자동 부여한 것.
+    // 실제로 그 기간 내내 컷팅한 게 아니므로 추정값으로 표시한다.
+    p.assumed = p.end < BULK_START;
   });
   return out;
 }
@@ -1409,7 +1454,9 @@ function renderPhaseStrip(){
   const hist=woPhaseHistory();
   if(!hist.length){ el.innerHTML=''; return; }
   const cur=woCurrentPhase();
-  const recent=hist.slice(-4);   // 최근 4국면만
+  // 너무 짧은 국면(측정 1~2회짜리)은 노이즈라 스트립에서 감춘다
+  const meaningful=hist.filter((p,i)=>p.current||p.days>=7||p.n>=3);
+  const recent=(meaningful.length?meaningful:hist).slice(-4);
   const col=g=>g==='컷팅'?'#60a5fa':g==='더티벌크'?'#fb923c':g==='눈바디개선'?'#a78bfa':'#4ade80';
   el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.7rem .85rem;margin-bottom:.75rem">
     <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px">
@@ -1418,9 +1465,10 @@ function renderPhaseStrip(){
       <span style="font-size:10.5px;color:var(--text3)">${cur.start} 시작${cur.fresh?' (기록 없음)':` · 측정 ${cur.n}회`}</span>
     </div>
     <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;font-size:10.5px;font-family:'DM Mono',monospace">
-      ${recent.map((p,i)=>`<span style="color:${col(p.goal)};${p.current?'font-weight:700':'opacity:.65'}">${PHASE_SHORT[p.goal]||p.goal} ${p.days}일</span>${i<recent.length-1?'<span style="color:var(--text3)">→</span>':''}`).join('')}
+      ${recent.map((p,i)=>`<span style="color:${col(p.goal)};${p.current?'font-weight:700':'opacity:.65'}">${PHASE_SHORT[p.goal]||p.goal} ${p.days}일${p.assumed?'<span style="color:var(--text3);font-size:9.5px">(추정)</span>':''}</span>${i<recent.length-1?'<span style="color:var(--text3)">→</span>':''}`).join('')}
     </div>
-    ${hist.length>4?`<div style="font-size:10px;color:var(--text3);margin-top:3px">이전 ${hist.length-4}개 국면 생략</div>`:''}
+    ${(meaningful.length||hist.length)>4?`<div style="font-size:10px;color:var(--text3);margin-top:3px">이전 ${(meaningful.length||hist.length)-4}개 국면 생략</div>`:''}
+    ${recent.some(p=>p.assumed)?`<div style="font-size:10px;color:var(--text3);margin-top:3px">(추정) = 목표 라벨이 없던 옛 기록에 자동 부여된 값이라 실제 국면과 다를 수 있어</div>`:''}
   </div>`;
 }
 
@@ -1458,6 +1506,7 @@ function renderAll(){
   renderMonthlyTrend();
   renderBackupBanner();
   renderTriggerBanner();
+  try{ renderBadDateBanner(); }catch(e){ showErr('날짜 검증',e); }
   try{ renderPhaseStrip(); }catch(e){ showErr('국면 표시',e); }
 }
 
@@ -2624,12 +2673,28 @@ function renderWoRec(){
   // 주당 목표/실제 세트 수 (절대 기준 비교용)
   const weeklyTotal=(actSets/DAYS)*7;
   const freq = 7 - (recCfg.rest||[]).length;    // 휴무일에서 자동 산출
-  const weeklyTargetTotal = freq * 12;          // 세션당 12세트 가정
+  // 컷팅(미니컷) 중엔 칼로리 적자로 회복 능력이 떨어진다.
+  // 미니컷 스펙이 '훈련 강도 유지 · 볼륨 20% 감량 허용'이므로 목표 볼륨도 20% 낮춘다.
+  const isCut = (goalCfg.type==='컷팅');
+  const weeklyTargetTotal = Math.round(freq * 12 * (isCut?0.8:1));
   const perPart={}; active.forEach(p=>perPart[p]={
     actual: +((st[p].sets/DAYS)*7).toFixed(1),
     target: +(weeklyTargetTotal*tgt[p]/100).toFixed(1)
   });
 
+  // 14일 창에 국면 전환이 걸쳐 있으면, 이전 국면 기록이 아직 평균에 남아 있다는 걸 알려준다.
+  // ("컷팅 시작했는데 왜 계속 초과냐"의 실제 답)
+  let phaseNote='';
+  {
+    const ph=woCurrentPhase();
+    if(ph&&ph.days<DAYS){
+      const carry=DAYS-ph.days;
+      phaseNote=`<div style="font-size:11px;color:#60a5fa;margin-bottom:.5rem;line-height:1.55">
+        ${ph.goal} ${ph.days}일차 — 최근 ${DAYS}일 창에 이전 국면 기록 ${carry}일치가 아직 섞여 있어.
+        지금 수치는 그만큼 이전 국면 볼륨이 끌어올린 값이고, ${carry}일 더 지나야 순수 ${ph.goal} 기준이 돼.
+      </div>`;
+    }
+  }
   const PLAN=renderWoPlan(tgt,excl);
   const now=new Date();
   const hoursSince=p=>st[p].last? (now-st[p].last)/3600000 : 9999;
@@ -2725,6 +2790,7 @@ function renderWoRec(){
   const col=v=>v<=-5?'#4ade80':v<5?'#fbbf24':'#f87171';
 
   el.innerHTML=`
+    ${phaseNote}
     ${PLAN&&PLAN.isRest?`<div class="a-card info" style="margin-bottom:.6rem;padding:.8rem .9rem">
       <div style="font-size:14px;font-weight:600;margin-bottom:4px">😴 오늘(${WD[PLAN.todayD]})은 휴무일</div>
       <div style="font-size:11.5px;color:var(--text2);line-height:1.55">
@@ -2739,7 +2805,7 @@ function renderWoRec(){
         ${volOver?`주 평균 총량 ${weeklyTotal.toFixed(0)}세트가 목표 ${weeklyTargetTotal}세트를 ${Math.round((weeklyTotal/weeklyTargetTotal-1)*100)}% 초과했어.`:''}
       </div>
       <div style="font-size:11.5px;color:var(--text2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border);line-height:1.6">
-        필요한 건 부위 추가가 아니라 <b>총량 감축</b>이야. 초과 부위에서 세트를 덜어내고,
+        필요한 건 부위 추가가 아니라 <b>총량 감축</b>이야.${isCut?' 특히 컷팅 중엔 칼로리 적자라 회복이 안 따라와서, 볼륨 초과가 그대로 근손실로 이어져.':''} 초과 부위에서 세트를 덜어내고,
         ${(()=>{
           const st=cands.filter(c=>AUX_PARTS.includes(c.p)&&(c.days==null||c.days>=7));
           return st.length?`방치된 보조 부위(${st.map(c=>`${c.p}${c.days!=null?' '+c.days+'일':' 기록없음'}`).join(', ')})만 3세트씩 채우는 정도로 가.`
@@ -2805,8 +2871,9 @@ function renderWoRec(){
     </tbody></table>
 
     <div style="font-size:11px;color:var(--text2);margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border);line-height:1.6">
-      <b>주 평균 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${freq}회 × 12세트)
-      ${weeklyTotal>weeklyTargetTotal*1.25?'<br><span style="color:#fb923c">목표보다 25% 이상 많아 — 회복이 안 따라오면 디로드 시점이야.</span>':''}
+      <b>주 평균 총량</b> ${weeklyTotal.toFixed(0)}세트 / 목표 ${weeklyTargetTotal}세트 (주 ${freq}회 × ${isCut?'12세트 × 0.8':'12세트'})
+      ${isCut?'<br><span style="color:#60a5fa">컷팅 중이라 목표를 20% 낮춰 잡았어 — 적자 상태에선 회복이 안 따라와서 볼륨 초과가 바로 근손실로 간다.</span>':''}
+      ${weeklyTotal>weeklyTargetTotal*1.25?`<br><span style="color:${isCut?'#f87171':'#fb923c'}">목표보다 25% 이상 많아 — ${isCut?'컷팅 중 이 볼륨은 근손실 위험이 커. 세트를 먼저 줄여.':'회복이 안 따라오면 디로드 시점이야.'}</span>`:''}
       ${weeklyTotal<weeklyTargetTotal*0.7?'<br><span style="color:#fbbf24">목표보다 30% 이상 적어 — 자극이 부족할 수 있어.</span>':''}
       ${cands.filter(c=>c.days!=null&&c.days>=7).length?`<br><span style="color:#fbbf24">${cands.filter(c=>c.days>=7).map(c=>`${c.p} ${c.days}일`).join(', ')} 방치 중 — 주 2회 자극이 주 1회보다 유리해서 순위 가점이 들어가 있어.</span>`:''}
       <br><span style="color:var(--text3);font-size:10.5px">순위 점수 = 볼륨 갭 − 방치 가점. 낮을수록 우선. 가점은 ${STALE_FROM}일까지 0이고 그 뒤로 가속해서, 9~10일 방치되면 갭 차이를 뒤집어.
