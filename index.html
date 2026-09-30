@@ -473,18 +473,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
     </div>
 
-    <!-- 종목별 추세 -->
-    <div class="card">
-      <div class="card-label">💪 전체 과부하 지수 <span style="color:var(--text3);font-weight:400;font-size:11px">— 부위별 종합</span></div>
-      <div id="woIndexRange" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.7rem">
-        <button type="button" class="g-btn wo-idx" data-d="28">4주</button>
-        <button type="button" class="g-btn wo-idx active" data-d="90">3개월</button>
-        <button type="button" class="g-btn wo-idx" data-d="180">6개월</button>
-        <button type="button" class="g-btn wo-idx" data-d="365">1년</button>
-      </div>
-      <div id="woIndexBody"></div>
-    </div>
-
     <div class="card">
       <div class="card-label">점진적 과부하 추세</div>
       <div class="field" style="max-width:260px;margin-bottom:.6rem">
@@ -510,6 +498,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="chart-wrap" style="height:230px"><canvas id="woTrendChart"></canvas></div>
       <div id="woBestNote" style="font-size:10.5px;color:var(--text3);margin-top:4px"></div>
       <div id="woAxisDebug" style="font-size:9.5px;color:#555;margin-top:3px;font-family:'DM Mono',monospace"></div>
+    </div>
+
+    <!-- 종목별 추세 -->
+    <div class="card">
+      <div class="card-label">💪 전체 과부하 지수 <span style="color:var(--text3);font-weight:400;font-size:11px">— 부위별 종합</span></div>
+      <div id="woIndexRange" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.7rem">
+        <button type="button" class="g-btn wo-idx active" data-d="28">1개월</button>
+        <button type="button" class="g-btn wo-idx" data-d="90">3개월</button>
+        <button type="button" class="g-btn wo-idx" data-d="180">6개월</button>
+        <button type="button" class="g-btn wo-idx" data-d="365">1년</button>
+      </div>
+      <div id="woIndexBody"></div>
     </div>
 
     <!-- 로그 목록 -->
@@ -583,7 +583,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 <script>
 // ── Constants & Keys ───────────────────────────────────
-const APP_VERSION='2026.09.16-h';
+const APP_VERSION='2026.09.30-a';
 try{ document.getElementById('appVer').textContent='v'+APP_VERSION; }catch(e){}
 console.log('체성분 트래커 '+APP_VERSION);
 
@@ -632,11 +632,12 @@ let woGymListKey  = null;       // 헬스장 datalist 캐시 키
 let assistOverride= {};         // 종목별 어시스트 수동 지정
 let subOverride   = {};         // 종목별 세부부위 수동 지정
 let trainLevel    = '중급';      // 훈련 연차 (속도 벤치마크용)
-let woIdxDays     = 90;         // 종합 지수 기간
+let woIdxDays     = 28;         // 종합 지수 기간 (기본 1개월)
 let woRangeDays   = 0;          // 그래프 기간 (0=전체)
 let woLogShow     = 10;         // 기록 목록에 보여줄 날짜 수
 let woLogOpen     = false;      // 기록 목록 펼침 여부 (기본 접힘)
-let woDetailOpen  = false;      // 부위별 상세표 펼침 여부 (기본 접힘)
+let woDetailOpen  = false;      // 부위 추천 상세표 펼침 여부 (기본 접힘)
+let woIdxDetailOpen = false;    // 전체 과부하 지수의 부위별 상세 (기본 접힘)
 
 // ── Load & Migrate ─────────────────────────────────────
 function init() {
@@ -2971,7 +2972,7 @@ function woWindowChange(S,days){
           gymsA:[...gA], gymsB:[...gB], limit:Math.round(limit)};
 }
 
-const WO_PERIODS=[[28,'4주'],[90,'3개월'],[180,'6개월'],[365,'1년']];
+const WO_PERIODS=[[28,'1개월'],[90,'3개월'],[180,'6개월'],[365,'1년']];
 
 
 // ── 과부하 진행 속도 평가 ───────────────────────────────
@@ -3113,6 +3114,8 @@ function renderWoIndex(){
       <div style="font-size:11px;color:var(--text3);margin-top:3px">${WO_PERIODS.find(p=>p[0]===woIdxDays)?.[1]||woIdxDays+'일'} 전 대비 · 집계에 쓴 종목 ${parts.reduce((s,p)=>s+byPart[p].filter(x=>x.c.trusted).length,0)}개${excluded.length?` · 제외 ${excluded.length}개`:''}</div>
     </div>
     ${speedCard}
+    <div style="font-size:11.5px;color:var(--text3);cursor:pointer;padding:5px 0;user-select:none" onclick="toggleWoIdxDetail()">${woIdxDetailOpen?'▼':'▶'} 부위별 상세 (${parts.length}개 부위 · 종목 ${parts.reduce((s,p)=>s+byPart[p].length,0)}개)</div>
+    ${woIdxDetailOpen?`
     <table class="wk-table"><tbody>
     ${sorted.map(p=>{
       const tn=byPart[p].filter(x=>x.c.trusted).length;
@@ -3132,7 +3135,7 @@ function renderWoIndex(){
       · <b>기기 다름</b>: 비교 두 구간의 헬스장이 달라 같은 종목이라도 기계 스펙이 다름 → 제외<br>
       · <b>이상치</b>: 기간 대비 변화가 과도(±${Math.round(OUTLIER_PCT*Math.max(1,woIdxDays/28))}% 초과) → 기기 변경·기록 오류 의심으로 제외<br>
       · 부위 가중: 신뢰 종목 3개 이상 1.0 / 2개 0.7 / 1개 0.4
-    </div>`;
+    </div>`:''}`;
 }
 
 function renderWoTrend(){
@@ -3183,8 +3186,21 @@ function renderWoTrendInner(){
   const bulkOnly = S.filter(s=>!s.minicut);
   const S_diag = bulkOnly.length>=2 ? Object.assign(bulkOnly,{ex:S.ex}) : S;
   const dg=woDiagnose(S_diag,bw);
+  // 전체 과부하 지수와 같은 형식의 큰 수치 — 이 종목이 지금 몇 %인지 한눈에.
+  // 기본 기간(woIdxDays)과 같은 창으로 맞춰서 전신 지수와 직접 비교 가능하게 한다.
+  const hdrC = woWindowChange(S_diag, woIdxDays);
+  const hdrLabel = WO_PERIODS.find(p=>p[0]===woIdxDays)?.[1] || (woIdxDays+'일');
+  const hdrPct = hdrC ? hdrC.pct : null;
+  const hCol = v=>v==null?'var(--text3)':v>=5?'#4ade80':v>=1?'#86efac':v>-1?'#fbbf24':v>-5?'#fb923c':'#f87171';
+  const headNum = `<div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:${hCol(hdrPct)}">${hdrPct==null?'—':(hdrPct>0?'+':'')+hdrPct.toFixed(1)+'%'}</span>
+      <span style="font-size:12.5px;color:var(--text2)">${ex} ${label}</span>
+      <span style="font-size:11px;color:var(--text3)">${hdrLabel} 전 대비${hdrPct==null?' · 데이터 부족':''}</span>
+    </div>`;
+
   const diagCard=`<div class="a-card ${dg.cls}" style="margin-bottom:.6rem">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+      ${headNum}
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;padding-top:6px;border-top:1px solid var(--border)">
         <span style="font-size:15px">${dg.icon}</span>
         <span style="font-size:14px;font-weight:600">${dg.verdict}</span>
       </div>
@@ -3401,6 +3417,7 @@ function renderWoTrendInner(){
 // 네이티브 <details>가 모바일에서 열자마자 즉시 닫혀버리는 문제가 있어
 // 직접 상태를 들고 있다가 다시 그리는 방식으로 바꿨다 (workout log 목록과 같은 패턴).
 function toggleWoDetail(){ woDetailOpen=!woDetailOpen; renderWoRec(); }
+function toggleWoIdxDetail(){ woIdxDetailOpen=!woIdxDetailOpen; renderWoIndex(); }
 
 function woMsg(type,msg){ const el=document.getElementById('woStatus'); el.className='status '+type; el.textContent=msg; }
 
